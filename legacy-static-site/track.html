@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Your Service — BikerClinic</title>
+  <meta name="description" content="Track your bike's service status in real time. Enter your BikerClinic Booking ID.">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <style>
+    .track-hero { background: var(--card); padding: 120px 0 60px; text-align: center; border-bottom: 1px solid var(--border); }
+    .search-box { display: flex; max-width: 500px; margin: 24px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 6px; box-shadow: var(--shadow-sm); }
+    .search-box input { flex: 1; background: transparent; border: none; padding: 12px 20px; font-size: 1rem; color: var(--text-primary); outline: none; }
+    .search-box button { background: var(--primary); color: #fff; border: none; padding: 12px 28px; border-radius: 99px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .search-box button:hover { opacity: 0.9; }
+
+    /* Timeline Container */
+    .tracking-container { max-width: 800px; margin: 60px auto; display: none; }
+    .tracking-container.active { display: block; }
+    
+    .tracker-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow-md); position: relative; overflow: hidden; }
+    
+    /* Bike Header Info */
+    .bike-info { display: flex; justify-content: space-between; align-items: center; padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+    .bike-info-left h3 { font-size: 1.4rem; margin-bottom: 4px; }
+    .bike-info-left p { color: var(--text-muted); font-size: 0.9rem; }
+    .bike-info-badge { background: rgba(255,61,0,0.1); color: var(--primary); padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; }
+
+    /* Vertical Timeline */
+    .timeline { position: relative; padding-left: 30px; }
+    .timeline::before { content: ''; position: absolute; left: 11px; top: 10px; bottom: 30px; width: 2px; background: var(--border); }
+    
+    .tl-item { position: relative; margin-bottom: 32px; }
+    .tl-item:last-child { margin-bottom: 0; }
+    
+    .tl-dot { position: absolute; left: -30px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); border: 4px solid var(--border); transition: 0.4s ease; z-index: 2; box-sizing: border-box; }
+    
+    .tl-content { opacity: 0.5; transition: 0.4s; }
+    .tl-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
+    .tl-desc { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* Active & Past States */
+    .tl-item.past .tl-dot { background: var(--success); border-color: rgba(0,230,118,0.2); }
+    .tl-item.past .tl-content { opacity: 1; }
+    
+    .tl-item.active .tl-dot { background: var(--primary); border: 4px solid rgba(255,61,0,0.3); box-shadow: 0 0 0 4px rgba(255,61,0,0.1); }
+    .tl-item.active .tl-content { opacity: 1; }
+    .tl-item.active .tl-title { color: var(--primary); }
+    
+    /* Fill line animation hack */
+    .timeline::after { content: ''; position: absolute; left: 11px; top: 10px; height: 0%; width: 2px; background: linear-gradient(to bottom, var(--success), var(--primary)); transition: height 1s ease-in-out; }
+    .progress-new::after { height: 0%; }
+    .progress-assigned::after { height: 33%; }
+    .progress-inprogress::after { height: 66%; }
+    .progress-completed::after { height: 100%; }
+
+    /* Mechanic / ETA Card */
+    .mechanic-card { display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: var(--radius-md); margin-top: 12px; }
+    .mechanic-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .error-msg { color: #ef4444; font-size: 0.9rem; margin-top: 12px; display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar" id="navbar">
+  <a href="index.html" class="nav-logo"><div class="logo-icon">🏍️</div><span>Biker<em>Clinic</em></span></a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="services.html">Services</a></li>
+    <li><a href="packages.html">Packages</a></li>
+    <li><a href="reviews.html">Reviews</a></li>
+    <li><a href="track.html" class="active">Track 📍</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="tel:+919008076398" class="nav-phone">📞 +91 90080 76398</a>
+    <a href="booking.html" class="btn btn-primary btn-sm">Book Now</a>
+  </div>
+  <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+</nav>
+<nav class="mobile-nav" id="mobileNav">
+  <a href="index.html">🏠 Home</a><a href="services.html">🔧 Services</a>
+  <a href="packages.html">📦 Packages</a><a href="track.html">📍 Track Order</a>
+  <a href="booking.html" class="btn btn-primary">Book Now</a>
+</nav>
+
+<!-- Hero Search -->
+<section class="track-hero">
+  <div class="container">
+    <div class="eyebrow" style="color:var(--primary);font-size:0.85rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px">📍 Live Status</div>
+    <h1 style="font-size:2.4rem">Track Your Service</h1>
+    <p style="color:var(--text-secondary);margin-top:8px">Enter your BikerClinic Booking ID to see real-time updates.</p>
+    
+    <form class="search-box" id="trackForm">
+      <input type="text" id="trackId" placeholder="e.g. BC123456" autocomplete="off" style="text-transform:uppercase" required>
+      <button type="submit" id="trackBtn">Track Bike</button>
+    </form>
+    <div class="error-msg" id="errorMsg">Booking not found. Please check your ID.</div>
+  </div>
+</section>
+
+<!-- Tracking View -->
+<section class="section" style="padding-top:0">
+  <div class="container">
+    <div class="tracking-container" id="trackingContainer">
+      <div class="tracker-card">
+        
+        <div class="bike-info">
+          <div class="bike-info-left">
+            <h3 id="tRiderBike">Royal Enfield Meteor 350</h3>
+            <p id="tDetails">Customer: Rahul Sharma · Home Classic Package</p>
+          </div>
+          <div>
+            <div class="bike-info-badge" id="tStatusBadge">Status: IN PROGRESS</div>
+          </div>
+        </div>
+
+        <div class="timeline" id="timelineUI">
+          
+          <div class="tl-item" id="tlItem1">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-title">Booking Confirmed</div>
+              <div class="tl-desc" id="tTime1">Waiting to be assigned</div>
+            </div>
+          </div>
+          
+          <div class="tl-item" id="tlItem2">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-title">Mechanic Assigned</div>
+              <div class="tl-desc" id="tTime2">A certified mechanic is preparing for your job</div>
+              <div class="mechanic-card" id="mechanicDetails" style="display:none">
+                <div class="mechanic-avatar">👨‍🔧</div>
+                <div>
+                  <div style="font-weight:700;font-size:0.95rem" id="tMechanicName">Kiran S.</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted)">Certified BikerClinic Specialist</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="tl-item" id="tlItem3">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-title">Service In Progress</div>
+              <div class="tl-desc" id="tTime3">Checking 35-point inspection list and performing repairs</div>
+            </div>
+          </div>
+
+          <div class="tl-item" id="tlItem4">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-title">Ready & Completed</div>
+              <div class="tl-desc" id="tTime4">Your bike is ready to ride!</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="js/main.js"></script>
+<script type="module">
+  import { db, IS_MOCK_MODE } from './js/firebase-config.js';
+  import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+  document.getElementById('trackForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const bId = document.getElementById('trackId').value.toUpperCase().trim();
+    const btn = document.getElementById('trackBtn');
+    const err = document.getElementById('errorMsg');
+    
+    if(!bId) return;
+    btn.textContent = 'Searching...';
+    err.style.display = 'none';
+
+    let bookingData = null;
+
+    if (IS_MOCK_MODE) {
+      const all = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+      bookingData = all.find(b => b.id === bId);
+      // simulate network delay for feel
+      await new Promise(r => setTimeout(r, 600)); 
+    } else {
+      try {
+        const q = query(collection(db, "bookings"), where("id", "==", bId));
+        const qs = await getDocs(q);
+        if(!qs.empty) bookingData = qs.docs[0].data();
+      } catch(e) { console.error(e); }
+    }
+
+    btn.textContent = 'Track Bike';
+
+    if (bookingData) {
+      renderTracker(bookingData);
+    } else {
+      err.style.display = 'block';
+      document.getElementById('trackingContainer').classList.remove('active');
+    }
+  });
+
+  function renderTracker(b) {
+    document.getElementById('trackingContainer').classList.add('active');
+    document.getElementById('trackingContainer').scrollIntoView({behavior:'smooth', block:'start'});
+
+    // 1. Fill Header
+    document.getElementById('tRiderBike').textContent = `${b.brand} ${b.model}`;
+    document.getElementById('tDetails').textContent = `Customer: ${b.name} · ${b.package || b.service}`;
+    document.getElementById('tStatusBadge').textContent = `STATUS: ${b.status.toUpperCase()}`;
+
+    // 2. Timeline Logic
+    const tl = document.getElementById('timelineUI');
+    tl.className = 'timeline'; // reset classes
+    
+    const i1 = document.getElementById('tlItem1');
+    const i2 = document.getElementById('tlItem2');
+    const i3 = document.getElementById('tlItem3');
+    const i4 = document.getElementById('tlItem4');
+    
+    [i1,i2,i3,i4].forEach(i => i.className = 'tl-item');
+    document.getElementById('mechanicDetails').style.display = 'none';
+
+    // Format timestamps safely
+    const formatTime = (ts) => ts ? new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+    
+    document.getElementById('tTime1').textContent = b.createdAt ? `Confirmed at ${formatTime(b.createdAt)}` : 'Confirmed successfully';
+
+    if (b.status === 'New') {
+      tl.classList.add('progress-new');
+      i1.classList.add('active');
+    } 
+    else if (b.status === 'Assigned') {
+      tl.classList.add('progress-assigned');
+      i1.classList.add('past');
+      i2.classList.add('active');
+      if(b.assignedMechanic) {
+        document.getElementById('mechanicDetails').style.display = 'flex';
+        document.getElementById('tMechanicName').textContent = b.assignedMechanic;
+      }
+      if(b.updatedAt) document.getElementById('tTime2').textContent = `Assigned at ${formatTime(b.updatedAt)}`;
+    }
+    else if (b.status === 'In Progress') {
+      tl.classList.add('progress-inprogress');
+      i1.classList.add('past'); i2.classList.add('past');
+      i3.classList.add('active');
+      if(b.assignedMechanic) {
+        document.getElementById('mechanicDetails').style.display = 'flex';
+        document.getElementById('tMechanicName').textContent = b.assignedMechanic;
+      }
+      if(b.updatedAt) document.getElementById('tTime3').textContent = `Work started at ${formatTime(b.updatedAt)}`;
+    }
+    else if (b.status === 'Completed') {
+      tl.classList.add('progress-completed');
+      i1.classList.add('past'); i2.classList.add('past'); i3.classList.add('past');
+      i4.classList.add('past', 'active');
+      if(b.assignedMechanic) {
+        document.getElementById('mechanicDetails').style.display = 'flex';
+        document.getElementById('tMechanicName').textContent = b.assignedMechanic;
+      }
+      if(b.updatedAt) document.getElementById('tTime4').textContent = `Completed at ${formatTime(b.updatedAt)}`;
+    }
+  }
+
+  // Auto-track if URL has ?id=BCxxxxxx
+  const params = new URLSearchParams(window.location.search);
+  const urlId = params.get('id');
+  if (urlId) {
+    document.getElementById('trackId').value = urlId;
+    document.getElementById('trackBtn').click();
+  }
+</script>
+</body>
+</html>

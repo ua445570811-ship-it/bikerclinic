@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Customer Login — BikerClinic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { background-color: var(--bg); display:flex; flex-direction:column; min-height:100vh; }
+    .content-wrapper { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; }
+    
+    .login-box { background:var(--surface); border:1px solid var(--border); padding:40px; border-radius:var(--radius-lg); width:100%; max-width:440px; text-align:center; box-shadow: var(--shadow-lg); }
+    .icon-box { width:64px; height:64px; border-radius:50%; background:rgba(255,61,0,0.1); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin:0 auto 20px; }
+    
+    .input-group { position:relative; margin-bottom:20px; text-align:left; }
+    .country-code { position:absolute; left:0; top:0; bottom:0; padding:0 16px; display:flex; align-items:center; color:var(--text-muted); font-weight:600; border-right:1px solid var(--border); }
+    .input-box { background:var(--card); border:1px solid var(--border); padding:16px 16px 16px 70px; border-radius:var(--radius-md); color:#fff; width:100%; font-size:1rem; outline:none; transition:0.2s; }
+    .input-box:focus { border-color:var(--primary); }
+    
+    .err-msg { color:var(--primary); font-size:0.85rem; margin-top:12px; display:none; }
+  </style>
+</head>
+<body>
+
+  <!-- Minimal Nav -->
+  <nav class="navbar scrolled">
+    <a href="../index.html" class="nav-logo">
+      <div class="logo-icon">🏍️</div>
+      <span>Biker<em>Clinic</em></span>
+    </a>
+  </nav>
+
+  <div class="content-wrapper">
+    <div class="login-box anim-fade-up">
+      <div class="icon-box">👤</div>
+      <h1 style="font-size:1.6rem;margin-bottom:8px">Welcome Back</h1>
+      <p style="color:var(--text-secondary);font-size:0.95rem;margin-bottom:32px;line-height:1.5">Enter the phone number associated with your BikerClinic bookings to access your garage.</p>
+      
+      <form id="loginForm">
+        <div class="input-group">
+          <div class="country-code">+91</div>
+          <input type="tel" id="userPhone" class="input-box" placeholder="10-digit mobile number" maxlength="10" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:16px;font-size:1.05rem">Send OTP</button>
+        <div id="errMsg" class="err-msg">Phone number not found in our records.</div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db, IS_MOCK_MODE } from '../js/firebase-config.js';
+    import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    // Auto-redirect
+    if (localStorage.getItem('bc_user_phone')) {
+      window.location.href = 'dashboard.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const phone = document.getElementById('userPhone').value.trim();
+      const btn = document.querySelector('button[type="submit"]');
+      const err = document.getElementById('errMsg');
+      
+      if(phone.length < 10) return;
+      btn.textContent = 'Verifying...';
+      err.style.display = 'none';
+
+      let exists = false;
+
+      // Check if user has any bookings before showing OTP (In a real app, generate OTP anyway)
+      if (IS_MOCK_MODE) {
+        const bookings = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+        exists = bookings.some(b => b.phone === phone);
+        // For testing, just let anyone log in if they type 10 digits
+        exists = true; 
+      } else {
+        try {
+          const q = query(collection(db, "bookings"), where("phone", "==", phone));
+          const qs = await getDocs(q);
+          if(!qs.empty) exists = true;
+          // Allowing fallback for new users to let them see empty dashboard
+          exists = true;
+        } catch(e) { console.error(e); }
+      }
+
+      setTimeout(() => {
+        if(exists) {
+            // Simulate OTP success
+            const code = prompt("Enter the 4-digit OTP sent to your phone: (Hint: any 4 digits)");
+            if(code && code.length === 4) {
+              localStorage.setItem('bc_user_phone', phone);
+              window.location.href = 'dashboard.html';
+            } else {
+              btn.textContent = 'Send OTP';
+              alert('Invalid OTP');
+            }
+        } else {
+          err.style.display = 'block';
+          btn.textContent = 'Send OTP';
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>

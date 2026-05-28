@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BikerClinic Admin Login</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:2.5rem;margin-bottom:8px">🏍️</div>
+      <h1 style="font-size:1.6rem;color:#1e293b">BikerClinic Admin</h1>
+      <p style="color:#64748b;font-size:0.9rem;margin-top:4px">Sign in to access the CRM Dashboard</p>
+    </div>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" class="form-control" placeholder="admin@bikerclinic.com" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+      </div>
+      <div id="errorMsg" style="color:red;font-size:0.85rem;margin-bottom:16px;display:none">Invalid credentials</div>
+      <button type="submit" class="btn-primary" id="loginBtn">Sign In to Dashboard</button>
+    </form>
+    
+    <div style="margin-top:24px;text-align:center;font-size:0.8rem;color:#64748b">
+      <p>Demo Note: If Mock Mode is enabled, any email/pwd will work.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, IS_MOCK_MODE } from '../js/firebase-config.js';
+    import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const pwd = document.getElementById('password').value;
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('errorMsg');
+      
+      btn.textContent = "Signing in...";
+      err.style.display = 'none';
+
+      if (IS_MOCK_MODE) {
+        // Mock mode: Allow any login, save session flag
+        sessionStorage.setItem('bc_admin_auth', 'true');
+        window.location.href = 'dashboard.html';
+        return;
+      }
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pwd);
+        window.location.href = 'dashboard.html';
+      } catch (error) {
+        btn.textContent = "Sign In to Dashboard";
+        err.textContent = "Invalid email or password.";
+        err.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>

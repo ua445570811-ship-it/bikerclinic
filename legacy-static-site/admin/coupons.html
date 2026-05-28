@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coupons Manager — BikerClinic Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .badge-active { background: rgba(16,185,129,0.1); color: var(--status-completed); padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+    .badge-inactive { background: rgba(239,68,68,0.1); color: #ef4444; padding: 4px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        🏍️ BikerClinic
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item">📊 Dashboard</a>
+        <a href="../mechanic/login.html" class="nav-item">👨‍🔧 Field Tech App</a>
+        <a href="coupons.html" class="nav-item active">🎫 Coupons Manager</a>
+        <a href="#" class="nav-item" onclick="alert('Coming soon in Phase 3!')">⚙️ Services Config</a>
+        <a href="#" class="nav-item" id="logoutBtn" style="margin-top:auto;color:#ef4444">🚪 Logout</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <h2 style="font-size:1.1rem;font-weight:600">Coupons & Offer Manager</h2>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:0.85rem;color:var(--admin-muted)">Welcome, <strong>Admin</strong></span>
+          <div style="width:36px;height:36px;background:var(--admin-primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">A</div>
+        </div>
+      </header>
+
+      <div class="content-area" style="display:flex;gap:32px;align-items:flex-start">
+        
+        <!-- Generate Coupon Form -->
+        <div class="table-card" style="width: 350px; flex-shrink: 0; padding: 24px">
+          <h3 style="font-size:1.05rem;margin-bottom:20px">Create Promo Code</h3>
+          <form id="couponForm">
+            <div class="form-group">
+              <label for="cCode">Promo Code Name</label>
+              <input type="text" id="cCode" class="form-control" placeholder="e.g. WELCOME50" style="text-transform:uppercase" required>
+            </div>
+            
+            <div class="form-grid">
+              <div class="form-group" style="margin-bottom:0">
+                <label for="cType">Discount Type</label>
+                <select id="cType" class="form-control" required>
+                  <option value="flat">Flat (₹)</option>
+                  <option value="percent">Percentage (%)</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label for="cValue">Value</label>
+                <input type="number" id="cValue" class="form-control" placeholder="e.g. 150" min="1" required>
+              </div>
+            </div>
+            
+            <p style="font-size:0.8rem;color:var(--admin-muted);margin-bottom:20px">Tip: Enter percentage without % sign.</p>
+            <button type="submit" class="btn-primary" id="saveCouponBtn">Generate Coupon</button>
+          </form>
+        </div>
+
+        <!-- Coupons Table -->
+        <div class="table-card" style="flex:1">
+          <div class="table-header">
+            <h3 style="font-size:1.05rem">Active & Expired Promo Codes</h3>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Discount</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="couponsTableBody">
+              <tr>
+                <td colspan="4" style="text-align:center;padding:40px;color:var(--admin-muted)">Loading coupons...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { db, auth, IS_MOCK_MODE } from '../js/firebase-config.js';
+    import { collection, query, orderBy, onSnapshot, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+    // Auth Guard
+    if (IS_MOCK_MODE) {
+      if (!sessionStorage.getItem('bc_admin_auth')) window.location.href = 'login.html';
+    } else {
+      onAuthStateChanged(auth, user => {
+        if (!user) window.location.href = 'login.html';
+      });
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (IS_MOCK_MODE) {
+        sessionStorage.removeItem('bc_admin_auth');
+        window.location.href = 'login.html';
+      } else {
+        signOut(auth).then(() => window.location.href = 'login.html');
+      }
+    });
+
+    // Form Submit
+    document.getElementById('couponForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const codeInput = document.getElementById('cCode').value.toUpperCase().trim();
+      const typeInput = document.getElementById('cType').value;
+      const valInput = Number(document.getElementById('cValue').value);
+      
+      const newCoupon = {
+        code: codeInput,
+        type: typeInput,
+        value: valInput,
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+
+      if (IS_MOCK_MODE) {
+        let prev = JSON.parse(localStorage.getItem('bc_coupons') || '[]');
+        // Don't allow duplicates
+        if (!prev.find(c => c.code === newCoupon.code)) {
+          prev.push(newCoupon);
+          localStorage.setItem('bc_coupons', JSON.stringify(prev));
+          document.getElementById('couponForm').reset();
+          fetchMockCoupons();
+        } else {
+          alert('Coupon code already exists!');
+        }
+      } else {
+        try {
+          // Use the code itself as the Doc ID so we can easily fetch by ID on the frontend!
+          await setDoc(doc(db, "coupons", newCoupon.code), newCoupon);
+          document.getElementById('couponForm').reset();
+        } catch(err) { console.error('Error adding coupon', err); }
+      }
+    });
+
+    // Fetch and Render
+    const tableBody = document.getElementById('couponsTableBody');
+
+    function renderCoupons(data) {
+      if (data.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--admin-muted)">No promo codes generated yet.</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = '';
+      data.forEach(c => {
+        const tr = document.createElement('tr');
+        const displayValue = c.type === 'percent' ? `${c.value}% OFF` : `₹${c.value} OFF`;
+        tr.innerHTML = `
+          <td style="font-weight:700;letter-spacing:0.05em">${c.code}</td>
+          <td style="color:var(--admin-primary);font-weight:600">${displayValue}</td>
+          <td><span class="${c.active ? 'badge-active' : 'badge-inactive'}">${c.active ? 'Active' : 'Disabled'}</span></td>
+          <td>
+            <button class="toggle-btn" style="padding:4px 10px;font-size:0.8rem;cursor:pointer" data-id="${c.code || c.id}" data-current="${c.active}">
+              ${c.active ? 'Disable' : 'Enable'}
+            </button>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+
+      // Toggle Listener
+      document.querySelectorAll('.toggle-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.dataset.id;
+          const currentStatus = e.target.dataset.current === 'true';
+          const newStatus = !currentStatus;
+
+          if (IS_MOCK_MODE) {
+            let prev = JSON.parse(localStorage.getItem('bc_coupons') || '[]');
+            const idx = prev.findIndex(x => x.code === id);
+            if(idx > -1) {
+               prev[idx].active = newStatus;
+               localStorage.setItem('bc_coupons', JSON.stringify(prev));
+               fetchMockCoupons();
+            }
+          } else {
+            await updateDoc(doc(db, "coupons", id), { active: newStatus });
+          }
+        });
+      });
+    }
+
+    // Mock Fetch
+    function fetchMockCoupons() {
+      const data = JSON.parse(localStorage.getItem('bc_coupons') || '[]');
+      data.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      renderCoupons(data);
+    }
+
+    if (IS_MOCK_MODE) {
+      fetchMockCoupons();
+    } else {
+      const q = query(collection(db, "coupons"), orderBy("createdAt", "desc"));
+      onSnapshot(q, snapshot => {
+        renderCoupons(snapshot.docs.map(d => ({...d.data(), id: d.id})));
+      });
+    }
+
+  </script>
+</body>
+</html>

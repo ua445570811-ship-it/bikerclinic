@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>My Garage — BikerClinic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    body { background-color: var(--bg); display:flex; flex-direction:column; min-height:100vh; }
+    
+    .dashboard-hero { background:var(--surface); border-bottom:1px solid var(--border); padding:40px 20px; }
+    .hero-content { max-width:800px; margin:0 auto; display:flex; justify-content:space-between; align-items:flex-end; }
+    .user-greeting { font-size:1.8rem; margin-bottom:8px; }
+    .user-phone { color:var(--text-muted); font-size:0.95rem; }
+    
+    .dash-container { max-width:800px; margin:40px auto; padding:0 20px; width:100%; flex:1; }
+    
+    .section-title { font-size:1.2rem; font-weight:700; margin-bottom:20px; color:var(--text-primary); border-bottom:1px solid var(--border); padding-bottom:12px; }
+    
+    .booking-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; margin-bottom:20px; position:relative; overflow:hidden; }
+    .bc-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .bc-id { font-weight:700; color:var(--primary); letter-spacing:0.05em; font-size:0.9rem; }
+    .bc-status { padding:6px 12px; border-radius:99px; font-size:0.8rem; font-weight:700; }
+    .status-completed { background:rgba(0,230,118,0.1); color:var(--success); }
+    .status-active { background:rgba(255,61,0,0.1); color:var(--primary); }
+    
+    .bc-body { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .bc-info-group label { display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; }
+    .bc-info-group div { font-size:1.05rem; font-weight:600; }
+    
+    .bc-actions { margin-top:20px; display:flex; gap:12px; }
+    
+    .empty-state { text-align:center; padding:60px 20px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg); }
+    .empty-icon { font-size:3rem; margin-bottom:16px; opacity:0.5; }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar scrolled">
+    <a href="../index.html" class="nav-logo">
+      <div class="logo-icon">🏍️</div>
+      <span>Biker<em>Clinic</em></span>
+    </a>
+    <div class="nav-actions">
+      <button id="logoutBtn" class="btn btn-ghost btn-sm" style="color:var(--primary)">🚪 Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="dashboard-hero">
+    <div class="hero-content">
+      <div>
+        <h1 class="user-greeting" id="greetingUser">My Garage</h1>
+        <div class="user-phone" id="greetingPhone">+91-XXXXXXXXXX</div>
+      </div>
+      <div>
+        <a href="../booking.html" class="btn btn-primary" style="padding:10px 20px;font-size:0.9rem">🔧 New Booking</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-container">
+    
+    <div id="activeSection">
+      <h2 class="section-title">Active Services</h2>
+      <div id="activeBookingsList"></div>
+    </div>
+
+    <div style="margin-top:40px">
+      <h2 class="section-title">Past Services</h2>
+      <div id="pastBookingsList"></div>
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { db, IS_MOCK_MODE } from '../js/firebase-config.js';
+    import { collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    const userPhone = localStorage.getItem('bc_user_phone');
+    if (!userPhone) {
+      window.location.href = 'login.html';
+    }
+
+    document.getElementById('greetingPhone').textContent = '+91 ' + userPhone;
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('bc_user_phone');
+      window.location.href = '../index.html';
+    });
+
+    const activeList = document.getElementById('activeBookingsList');
+    const pastList = document.getElementById('pastBookingsList');
+
+    function renderBookings(data) {
+      if (data.length > 0) {
+        document.getElementById('greetingUser').textContent = `Hi, ${data[0].name.split(' ')[0]} 👋`;
+      }
+
+      const activeData = data.filter(b => b.status !== 'Completed');
+      const pastData = data.filter(b => b.status === 'Completed');
+
+      // Render Active
+      if (activeData.length === 0) {
+        activeList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🏖️</div>
+            <h3 style="margin-bottom:8px">No active services</h3>
+            <p style="color:var(--text-muted);font-size:0.95rem">Your bikes are running smooth. Keep it up!</p>
+          </div>
+        `;
+      } else {
+        activeList.innerHTML = activeData.map(b => createCard(b, true)).join('');
+      }
+
+      // Render Past
+      if (pastData.length === 0) {
+        pastList.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:24px 0">No past service history.</div>`;
+      } else {
+        pastList.innerHTML = pastData.map(b => createCard(b, false)).join('');
+      }
+    }
+
+    function createCard(b, isActive) {
+      return `
+        <div class="booking-card">
+          <div class="bc-header">
+            <div class="bc-id">${b.id}</div>
+            <div class="bc-status ${isActive ? 'status-active' : 'status-completed'}">${b.status.toUpperCase()}</div>
+          </div>
+          <div class="bc-body">
+            <div class="bc-info-group">
+              <label>Vehicle</label>
+              <div>${b.brand} ${b.model}</div>
+            </div>
+            <div class="bc-info-group">
+              <label>Service Package</label>
+              <div>${b.package || b.service}</div>
+            </div>
+            <div class="bc-info-group" style="margin-top:8px">
+              <label>Appointment</label>
+              <div style="font-size:0.9rem">${b.date} · ${b.time}</div>
+            </div>
+            <div class="bc-info-group" style="margin-top:8px">
+              <label>Location</label>
+              <div style="font-size:0.9rem;text-transform:capitalize">${b.serviceType}</div>
+            </div>
+          </div>
+          ${isActive ? `
+          <div class="bc-actions">
+            <a href="../track.html?id=${b.id}" class="btn btn-primary" style="flex:1;text-align:center;padding:12px;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.95rem">📍 Track Live Status</a>
+          </div>
+          ` : `
+          <div class="bc-actions" style="margin-top:24px;border-top:1px solid var(--border);padding-top:16px">
+             <a href="../booking.html" class="btn btn-ghost" style="flex:1;text-align:center;padding:10px;border-radius:8px;border:1px solid var(--border)">Book Again</a>
+          </div>
+          `}
+        </div>
+      `;
+    }
+
+    if (IS_MOCK_MODE) {
+      setInterval(() => {
+        const bd = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+        const myData = bd.filter(x => x.phone === userPhone).reverse();
+        renderBookings(myData);
+      }, 1000); // Poll for demo
+    } else {
+      const q = query(collection(db, "bookings"), where("phone", "==", userPhone));
+      onSnapshot(q, (snapshot) => {
+        const myData = snapshot.docs.map(d => ({ ...d.data(), _docId: d.id }));
+        // reverse to put newest first roughly
+        renderBookings(myData.reverse());
+      });
+    }
+
+  </script>
+</body>
+</html>

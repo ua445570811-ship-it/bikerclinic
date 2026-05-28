@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>BikerClinic — Professional Bike Service & Repair Bangalore</title>
+  <meta name="description" content="BikerClinic offers expert motorcycle service, repair, and maintenance at your doorstep in Bangalore. Certified mechanics, genuine parts, transparent pricing."/>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/animations.css"/>
+  <style>
+    /* Booking widget toast */
+    .toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--card); border: 1px solid var(--border); color: var(--text-primary);
+      padding: 12px 24px; border-radius: var(--radius-md); font-size: 0.9rem;
+      opacity: 0; transition: all 0.3s ease; z-index: 9999; white-space: nowrap;
+      box-shadow: var(--shadow-md);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.toast-error { border-color: var(--primary); color: var(--primary); }
+    .toast.toast-success { border-color: var(--success); color: var(--success); }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ────────────────────────────────────── -->
+<nav class="navbar" id="navbar">
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">🏍️</div>
+    <span>Biker<em>Clinic</em></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="index.html" class="active">Home</a></li>
+    <li><a href="services.html">Services</a></li>
+    <li><a href="packages.html">Packages</a></li>
+    <li><a href="offers.html">Offers 🔥</a></li>
+    <li><a href="reviews.html">Reviews</a></li>
+    <li><a href="track.html">Track 📍</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="user/login.html" class="btn btn-ghost btn-sm" style="color:var(--text-primary);border-color:var(--border)">👤 My Garage</a>
+    <a href="booking.html" class="btn btn-primary btn-sm">Book Now</a>
+  </div>
+  <button class="hamburger" id="hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<nav class="mobile-nav" id="mobileNav">
+  <a href="index.html">🏠 Home</a>
+  <a href="services.html">🔧 Services</a>
+  <a href="packages.html">📦 Packages</a>
+  <a href="offers.html">🔥 Offers</a>
+  <a href="track.html">📍 Track Order</a>
+  <a href="reviews.html">⭐ Reviews</a>
+  <a href="user/login.html">👤 My Garage</a>
+  <a href="booking.html" class="btn btn-primary">Book Now</a>
+</nav>
+
+<!-- ── HERO ─────────────────────────────────────── -->
+<section class="hero-section" id="home">
+  <div class="hero-bg-glow"></div>
+  <div class="hero-bg-glow2"></div>
+  <div class="container">
+    <div class="hero-grid">
+      <!-- Content -->
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="dot"></span> Bangalore's #1 Bike Service Platform
+        </div>
+        <h1 class="anim-fade-up">
+          Your Bike Deserves<br/>
+          <span class="text-gradient">The Best Care</span>
+        </h1>
+        <p class="anim-fade-up delay-1">
+          Expert diagnostics, genuine parts, certified mechanics — all at your doorstep.
+          GoMechanic-style transparency for every two-wheeler in Bangalore.
+        </p>
+        <div class="hero-cta-group anim-fade-up delay-2">
+          <a href="booking.html" class="btn btn-primary btn-lg">🔧 Book a Service</a>
+          <a href="packages.html" class="btn btn-ghost btn-lg">📦 View Packages</a>
+        </div>
+
+        <!-- Booking Widget -->
+        <form class="booking-widget anim-fade-up delay-3" id="heroBookingForm">
+          <h3>⚡ Quick Estimate</h3>
+          <div class="booking-widget-grid">
+            <div>
+              <label for="wBrand">Bike Brand</label>
+              <select id="wBrand" class="form-control">
+                <option value="">Select Brand</option>
+                <option>Hero</option><option>Bajaj</option><option>Royal Enfield</option>
+                <option>Honda</option><option>Yamaha</option><option>TVS</option>
+                <option>Suzuki</option><option>KTM</option><option>BMW</option>
+                <option>Kawasaki</option><option>Ducati</option><option>Harley-Davidson</option>
+              </select>
+            </div>
+            <div>
+              <label for="wService">Service Type</label>
+              <select id="wService" class="form-control">
+                <option value="">Select Service</option>
+                <option>Periodic Service</option>
+                <option>Engine Tuning</option>
+                <option>Brakes &amp; Clutch</option>
+                <option>Battery Service</option>
+                <option>Oil Change</option>
+                <option>Tyres</option>
+                <option>Accident Repair</option>
+                <option>Roadside Assistance</option>
+              </select>
+            </div>
+            <div>
+              <label for="wLocation">Location</label>
+              <input type="text" id="wLocation" class="form-control" placeholder="📍 Bangalore" value="Bangalore" readonly/>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center">Get Estimate</button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Stats -->
+        <div class="hero-stats anim-fade-up delay-4">
+          <div class="hero-stat">
+            <div class="num"><span data-target="500" data-suffix="+">0</span></div>
+            <div class="lbl">Bikes Serviced</div>
+          </div>
+          <div class="hero-stat">
+            <div class="num"><span data-target="4.9" data-suffix="★">0</span></div>
+            <div class="lbl">Customer Rating</div>
+          </div>
+          <div class="hero-stat">
+            <div class="num"><span data-target="100" data-suffix="%">0</span></div>
+            <div class="lbl">Genuine Parts</div>
+          </div>
+          <div class="hero-stat">
+            <div class="num"><span data-target="24" data-suffix="h">0</span></div>
+            <div class="lbl">Quick Service</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual -->
+      <div class="hero-visual">
+        <div class="hero-ring hero-ring-1"></div>
+        <div class="hero-ring hero-ring-2"></div>
+        <div class="hero-ring hero-ring-3"></div>
+        <svg class="hero-bike-img" viewBox="0 0 540 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Stylized motorcycle SVG illustration -->
+          <ellipse cx="120" cy="260" rx="65" ry="65" stroke="#FF3D00" stroke-width="10" fill="none"/>
+          <ellipse cx="120" cy="260" rx="35" ry="35" fill="#1A1A26" stroke="#FF3D00" stroke-width="4"/>
+          <ellipse cx="420" cy="260" rx="65" ry="65" stroke="#FF3D00" stroke-width="10" fill="none"/>
+          <ellipse cx="420" cy="260" rx="35" ry="35" fill="#1A1A26" stroke="#FF3D00" stroke-width="4"/>
+          <!-- Frame -->
+          <path d="M155 260 L200 170 L290 155 L380 200 L420 260" stroke="#9E9EB5" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <path d="M200 170 L255 260" stroke="#9E9EB5" stroke-width="8" fill="none"/>
+          <path d="M290 155 L255 260" stroke="#9E9EB5" stroke-width="6" fill="none"/>
+          <!-- Engine block -->
+          <rect x="215" y="200" width="80" height="55" rx="8" fill="#1A1A26" stroke="#FF3D00" stroke-width="2.5"/>
+          <rect x="230" y="215" width="50" height="25" rx="4" fill="#212133"/>
+          <!-- Fuel tank -->
+          <path d="M220 155 Q270 130 320 150 L310 195 L230 195 Z" fill="#FF3D00" opacity="0.9"/>
+          <!-- Seat -->
+          <path d="M290 155 Q340 148 380 165 L375 185 Q330 168 290 175 Z" fill="#212133" stroke="#5A5A7A" stroke-width="1.5"/>
+          <!-- Headlight -->
+          <ellipse cx="180" cy="162" rx="22" ry="16" fill="#1A1A26" stroke="#FFD600" stroke-width="2"/>
+          <ellipse cx="180" cy="162" rx="12" ry="9" fill="#FFD600" opacity="0.5"/>
+          <!-- Exhaust -->
+          <path d="M295 245 Q330 255 395 250" stroke="#5A5A7A" stroke-width="6" stroke-linecap="round"/>
+          <!-- Handle bar -->
+          <path d="M160 148 L200 165 L200 175" stroke="#9E9EB5" stroke-width="5" stroke-linecap="round"/>
+          <line x1="145" y1="142" x2="177" y2="155" stroke="#9E9EB5" stroke-width="5" stroke-linecap="round"/>
+          <!-- Glow -->
+          <ellipse cx="270" cy="300" rx="180" ry="18" fill="url(#glow)" opacity="0.4"/>
+          <defs>
+            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#FF3D00"/>
+              <stop offset="100%" stop-color="transparent"/>
+            </radialGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TRUST BAR ──────────────────────────────────── -->
+<div class="trust-bar">
+  <div class="trust-bar-inner">
+    <div class="trust-item"><span class="icon">✅</span> Certified Mechanics</div>
+    <span class="trust-sep">|</span>
+    <div class="trust-item"><span class="icon">🔩</span> Genuine OEM Parts</div>
+    <span class="trust-sep">|</span>
+    <div class="trust-item"><span class="icon">💰</span> Transparent Pricing</div>
+    <span class="trust-sep">|</span>
+    <div class="trust-item"><span class="icon">🏠</span> Doorstep Service</div>
+    <span class="trust-sep">|</span>
+    <div class="trust-item"><span class="icon">⚡</span> Same-Day Service</div>
+  </div>
+</div>
+
+<!-- ── HOW IT WORKS ───────────────────────────────── -->
+<section class="section" id="how-it-works">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="eyebrow">⚙️ Simple Process</div>
+      <h2>How BikerClinic Works</h2>
+      <div class="divider"></div>
+      <p>Get your bike serviced in 3 easy steps — no hassle, no hidden charges</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card reveal delay-1">
+        <div class="step-num">1</div>
+        <h3>Select Service</h3>
+        <p>Choose your bike brand, model, and the service you need from our comprehensive catalog.</p>
+      </div>
+      <div class="step-card reveal delay-2">
+        <div class="step-num">2</div>
+        <h3>Book a Slot</h3>
+        <p>Pick a date and time that works for you — doorstep or workshop, your choice.</p>
+      </div>
+      <div class="step-card reveal delay-3">
+        <div class="step-num">3</div>
+        <h3>Relax! 😎</h3>
+        <p>Our certified mechanic arrives, services your bike, and you get a detailed service report.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SERVICES ───────────────────────────────────── -->
+<section class="section" id="services" style="background:var(--surface)">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="eyebrow">🔧 What We Fix</div>
+      <h2>Our Service Categories</h2>
+      <div class="divider"></div>
+      <p>From routine maintenance to complex repairs — we handle it all</p>
+    </div>
+    <div class="services-grid">
+      <div class="service-card reveal delay-1" data-service="Periodic Service">
+        <span class="service-icon">🔄</span>
+        <h3>Periodic Service</h3>
+        <p>Full tune-up, filter cleaning, fluids top-up</p>
+        <div class="starting">Starting ₹499</div>
+      </div>
+      <div class="service-card reveal delay-2" data-service="Engine Tuning">
+        <span class="service-icon">⚙️</span>
+        <h3>Engine Tuning</h3>
+        <p>Carburetor tune, spark plugs, valve adjustment</p>
+        <div class="starting">Starting ₹699</div>
+      </div>
+      <div class="service-card reveal delay-3" data-service="Brakes &amp; Clutch">
+        <span class="service-icon">🛑</span>
+        <h3>Brakes &amp; Clutch</h3>
+        <p>Brake pads, disc check, clutch cable &amp; plates</p>
+        <div class="starting">Starting ₹399</div>
+      </div>
+      <div class="service-card reveal delay-4" data-service="Battery Service">
+        <span class="service-icon">🔋</span>
+        <h3>Battery Service</h3>
+        <p>Battery check, replacement, terminals cleaning</p>
+        <div class="starting">Starting ₹299</div>
+      </div>
+      <div class="service-card reveal delay-1" data-service="Oil Change">
+        <span class="service-icon">🛢️</span>
+        <h3>Oil Change</h3>
+        <p>Engine oil flush &amp; refill with genuine grade oil</p>
+        <div class="starting">Starting ₹349</div>
+      </div>
+      <div class="service-card reveal delay-2" data-service="Tyres">
+        <span class="service-icon">🔵</span>
+        <h3>Tyres &amp; Wheels</h3>
+        <p>Tyre replacement, balancing, puncture repair</p>
+        <div class="starting">Starting ₹499</div>
+      </div>
+      <div class="service-card reveal delay-3" data-service="Accident Repair">
+        <span class="service-icon">⚡</span>
+        <h3>Accident Repair</h3>
+        <p>Body work, frame alignment, paint touch-up</p>
+        <div class="starting">Custom Quote</div>
+      </div>
+      <div class="service-card reveal delay-4" data-service="Roadside Assistance">
+        <span class="service-icon">🚨</span>
+        <h3>Roadside Rescue</h3>
+        <p>24/7 emergency assistance, towing, on-spot repair</p>
+        <div class="starting">Starting ₹199</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:40px">
+      <a href="services.html" class="btn btn-outline">View All Services →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── PACKAGES ───────────────────────────────────── -->
+<section class="section" id="packages">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="eyebrow">📦 Best Value</div>
+      <h2>Service Packages</h2>
+      <div class="divider"></div>
+      <p>Fixed-price packages — know exactly what you pay, no surprises</p>
+    </div>
+    <div class="packages-grid">
+      <!-- Classic -->
+      <div class="package-card reveal delay-1">
+        <div>
+          <div class="package-tag">Classic</div>
+          <div class="package-name">Home Classic</div>
+          <div class="package-cc">Up to 200CC</div>
+        </div>
+        <div class="package-price"><span class="currency">₹</span><span class="amount">799</span></div>
+        <ul class="package-features">
+          <li><span class="check">✓</span> Engine oil change (800ml)</li>
+          <li><span class="check">✓</span> Air filter cleaning</li>
+          <li><span class="check">✓</span> Chain lubrication</li>
+          <li><span class="check">✓</span> Brake adjustment</li>
+          <li><span class="check">✓</span> Spark plug check</li>
+          <li><span class="check">✓</span> General inspection</li>
+        </ul>
+        <button class="btn btn-outline pkg-book-btn" data-pkg="home-classic">Book Now</button>
+      </div>
+      <!-- Scooty -->
+      <div class="package-card reveal delay-2">
+        <div>
+          <div class="package-tag">Moped</div>
+          <div class="package-name">Scooty / Moped</div>
+          <div class="package-cc">Up to 100CC</div>
+        </div>
+        <div class="package-price"><span class="currency">₹</span><span class="amount">699</span></div>
+        <ul class="package-features">
+          <li><span class="check">✓</span> Engine oil change (600ml)</li>
+          <li><span class="check">✓</span> Air filter cleaning</li>
+          <li><span class="check">✓</span> CVT belt inspection</li>
+          <li><span class="check">✓</span> Brake adjustment</li>
+          <li><span class="check">✓</span> Tyre pressure check</li>
+          <li><span class="check">✓</span> Battery check</li>
+        </ul>
+        <button class="btn btn-outline pkg-book-btn" data-pkg="scooty-moped">Book Now</button>
+      </div>
+      <!-- Premium — featured -->
+      <div class="package-card featured reveal delay-3">
+        <div>
+          <div class="package-tag">Premium</div>
+          <div class="package-name">Home Premium</div>
+          <div class="package-cc">300–400CC</div>
+        </div>
+        <div class="package-price"><span class="currency">₹</span><span class="amount">1,099</span></div>
+        <ul class="package-features">
+          <li><span class="check">✓</span> Full synthetic oil change</li>
+          <li><span class="check">✓</span> Air &amp; oil filter cleaning</li>
+          <li><span class="check">✓</span> Chain clean &amp; lubricate</li>
+          <li><span class="check">✓</span> Brake pads inspection</li>
+          <li><span class="check">✓</span> Carburetor tuning</li>
+          <li><span class="check">✓</span> 35-point checklist</li>
+        </ul>
+        <button class="btn btn-primary pkg-book-btn" data-pkg="home-premium">Book Now</button>
+      </div>
+      <!-- Royal Enfield -->
+      <div class="package-card reveal delay-4">
+        <div>
+          <div class="package-tag">Royal Enfield</div>
+          <div class="package-name">Home RE Service</div>
+          <div class="package-cc">All RE Models</div>
+        </div>
+        <div class="package-price"><span class="currency">₹</span><span class="amount">1,899</span></div>
+        <ul class="package-features">
+          <li><span class="check">✓</span> 800ml RE-spec engine oil</li>
+          <li><span class="check">✓</span> Air &amp; fuel filter service</li>
+          <li><span class="check">✓</span> Valve clearance check</li>
+          <li><span class="check">✓</span> Chain &amp; sprocket adjustment</li>
+          <li><span class="check">✓</span> Compression test</li>
+          <li><span class="check">✓</span> Free foam wash</li>
+        </ul>
+        <button class="btn btn-outline pkg-book-btn" data-pkg="royal-enfield">Book Now</button>
+      </div>
+      <!-- Superbike -->
+      <div class="package-card reveal delay-5">
+        <div>
+          <div class="package-tag">Superbike</div>
+          <div class="package-name">Home SuperBike</div>
+          <div class="package-cc">600–1000CC</div>
+        </div>
+        <div class="package-price"><span class="currency">₹</span><span class="amount">2,799</span></div>
+        <ul class="package-features">
+          <li><span class="check">✓</span> Full synthetic oil change</li>
+          <li><span class="check">✓</span> OEM air filter replacement</li>
+          <li><span class="check">✓</span> Brake fluid top-up</li>
+          <li><span class="check">✓</span> Coolant check &amp; refill</li>
+          <li><span class="check">✓</span> Full diagnostics scan</li>
+          <li><span class="check">✓</span> Foam wash + detailing</li>
+        </ul>
+        <button class="btn btn-outline pkg-book-btn" data-pkg="superbike">Book Now</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:40px">
+      <a href="packages.html" class="btn btn-outline">Compare All Packages →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── BRAND MARQUEE ──────────────────────────────── -->
+<section class="section-sm" style="background:var(--surface)">
+  <div class="section-header reveal">
+    <div class="eyebrow">🏍️ All Brands</div>
+    <h2>Bikes We Service</h2>
+    <div class="divider"></div>
+  </div>
+  <div class="brands-marquee">
+    <div class="marquee-track" id="marqueeTrack">
+      <div class="brand-chip"><span class="logo-emoji">🔶</span> Hero</div>
+      <div class="brand-chip"><span class="logo-emoji">🔷</span> Bajaj</div>
+      <div class="brand-chip"><span class="logo-emoji">⚫</span> Royal Enfield</div>
+      <div class="brand-chip"><span class="logo-emoji">🔴</span> Honda</div>
+      <div class="brand-chip"><span class="logo-emoji">🔵</span> Yamaha</div>
+      <div class="brand-chip"><span class="logo-emoji">🟡</span> TVS</div>
+      <div class="brand-chip"><span class="logo-emoji">🟠</span> Suzuki</div>
+      <div class="brand-chip"><span class="logo-emoji">🟠</span> KTM</div>
+      <div class="brand-chip"><span class="logo-emoji">🔵</span> BMW</div>
+      <div class="brand-chip"><span class="logo-emoji">🟢</span> Kawasaki</div>
+      <div class="brand-chip"><span class="logo-emoji">🔴</span> Ducati</div>
+      <div class="brand-chip"><span class="logo-emoji">⚫</span> Harley-Davidson</div>
+      <!-- Duplicate for infinite loop -->
+      <div class="brand-chip"><span class="logo-emoji">🔶</span> Hero</div>
+      <div class="brand-chip"><span class="logo-emoji">🔷</span> Bajaj</div>
+      <div class="brand-chip"><span class="logo-emoji">⚫</span> Royal Enfield</div>
+      <div class="brand-chip"><span class="logo-emoji">🔴</span> Honda</div>
+      <div class="brand-chip"><span class="logo-emoji">🔵</span> Yamaha</div>
+      <div class="brand-chip"><span class="logo-emoji">🟡</span> TVS</div>
+      <div class="brand-chip"><span class="logo-emoji">🟠</span> Suzuki</div>
+      <div class="brand-chip"><span class="logo-emoji">🟠</span> KTM</div>
+      <div class="brand-chip"><span class="logo-emoji">🔵</span> BMW</div>
+      <div class="brand-chip"><span class="logo-emoji">🟢</span> Kawasaki</div>
+      <div class="brand-chip"><span class="logo-emoji">🔴</span> Ducati</div>
+      <div class="brand-chip"><span class="logo-emoji">⚫</span> Harley-Davidson</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── WHY BIKERCLINIC / STATS ────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="eyebrow">💪 Why Us</div>
+      <h2>Why Choose BikerClinic?</h2>
+      <div class="divider"></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card reveal delay-1">
+        <div class="num" data-target="500" data-suffix="+">0</div>
+        <div class="lbl">🏍️ Bikes Serviced</div>
+      </div>
+      <div class="stat-card reveal delay-2">
+        <div class="num" data-target="4.9" data-suffix="★">0</div>
+        <div class="lbl">⭐ Average Rating</div>
+      </div>
+      <div class="stat-card reveal delay-3">
+        <div class="num" data-target="100" data-suffix="%">0</div>
+        <div class="lbl">✅ Genuine Parts</div>
+      </div>
+      <div class="stat-card reveal delay-4">
+        <div class="num" data-target="3" data-suffix="yr">0</div>
+        <div class="lbl">🔨 Experience</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TESTIMONIALS ───────────────────────────────── -->
+<section class="section" style="background:var(--surface)">
+  <div class="container">
+    <div class="section-header reveal">
+      <div class="eyebrow">💬 Happy Riders</div>
+      <h2>What Our Customers Say</h2>
+      <div class="divider"></div>
+    </div>
+    <div class="testimonials-track" id="testimonialTrack">
+      <div class="testimonial-card">
+        <div class="testimonial-header">
+          <div class="testimonial-avatar">RS</div>
+          <div class="testimonial-meta">
+            <div class="name">Rahul Sharma</div>
+            <div class="bike">Royal Enfield Meteor 350</div>
+            <div class="stars">★★★★★</div>
+          </div>
+        </div>
+        <div class="testimonial-text">"BikerClinic saved me so much time! The mechanic came to my apartment, serviced my RE in 2 hours and the bike runs like new. Transparent pricing, no hidden charges."</div>
+        <div class="testimonial-date">March 2025</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-header">
+          <div class="testimonial-avatar">PA</div>
+          <div class="testimonial-meta">
+            <div class="name">Priya Anand</div>
+            <div class="bike">Honda Activa 6G</div>
+            <div class="stars">★★★★★</div>
+          </div>
+        </div>
+        <div class="testimonial-text">"Booked a scooty service online at midnight and they showed up the next morning. Super professional, showed me exactly what was done. Would 100% recommend."</div>
+        <div class="testimonial-date">February 2025</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-header">
+          <div class="testimonial-avatar">AK</div>
+          <div class="testimonial-meta">
+            <div class="name">Arun Kumar</div>
+            <div class="bike">KTM Duke 390</div>
+            <div class="stars">★★★★★</div>
+          </div>
+        </div>
+        <div class="testimonial-text">"These guys know performance bikes! They used the right oil grade, performed a proper valve check, and even caught a minor coolant leak. Brilliant service for the price."</div>
+        <div class="testimonial-date">March 2025</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-header">
+          <div class="testimonial-avatar">SM</div>
+          <div class="testimonial-meta">
+            <div class="name">Shreya Menon</div>
+            <div class="bike">TVS Jupiter 125</div>
+            <div class="stars">★★★★☆</div>
+          </div>
+        </div>
+        <div class="testimonial-text">"Excellent doorstep service. Mechanic was very polite and explained everything clearly. Fixed my brake issue on the spot. Only minor gripe was slight delay, but overall great!"</div>
+        <div class="testimonial-date">January 2025</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-header">
+          <div class="testimonial-avatar">VR</div>
+          <div class="testimonial-meta">
+            <div class="name">Vikram Reddy</div>
+            <div class="bike">Bajaj Pulsar NS 200</div>
+            <div class="stars">★★★★★</div>
+          </div>
+        </div>
+        <div class="testimonial-text">"Got the Home Premium package — absolute value for money. The 35-point checklist gave me so much confidence. My Pulsar has never been smoother. BikerClinic for life!"</div>
+        <div class="testimonial-date">April 2025</div>
+      </div>
+    </div>
+    <div class="carousel-controls">
+      <button class="carousel-btn" id="prevTestimonial">←</button>
+      <button class="carousel-btn" id="nextTestimonial">→</button>
+    </div>
+    <div style="text-align:center;margin-top:32px">
+      <a href="reviews.html" class="btn btn-ghost">Read All Reviews →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── APP / CTA BANNER ───────────────────────────── -->
+<section class="section">
+  <div class="container">
+    <div class="app-banner reveal">
+      <div>
+        <h2>Ready to Ride Again?</h2>
+        <p>Book your bike service in under 2 minutes. Certified mechanics, genuine parts, doorstep convenience — all in Bangalore.</p>
+        <div class="app-buttons">
+          <a href="booking.html" class="btn btn-primary btn-lg">🔧 Book a Service Now</a>
+          <a href="tel:+919008076398" class="app-btn">
+            <span class="app-icon">📞</span>
+            <div><small>Call Us</small><br/><strong>+91 90080 76398</strong></div>
+          </a>
+        </div>
+      </div>
+      <div style="font-size:7rem;opacity:0.15;display:flex;align-items:center">🏍️</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ─────────────────────────────────────── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo"><span style="font-size:1.5rem">🏍️</span> Biker<span style="color:var(--primary)">Clinic</span></div>
+        <p>Bangalore's premium doorstep bike service platform. Certified mechanics, transparent pricing, genuine OEM parts.</p>
+        <div class="footer-social">
+          <a href="#" class="social-btn" aria-label="Instagram">📸</a>
+          <a href="#" class="social-btn" aria-label="Facebook">📘</a>
+          <a href="https://wa.me/916363681719" class="social-btn" aria-label="WhatsApp">💬</a>
+          <a href="#" class="social-btn" aria-label="YouTube">▶️</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Services</h4>
+        <ul>
+          <li><a href="services.html">Periodic Service</a></li>
+          <li><a href="services.html">Engine Tuning</a></li>
+          <li><a href="services.html">Brakes &amp; Clutch</a></li>
+          <li><a href="services.html">Battery Service</a></li>
+          <li><a href="services.html">Oil Change</a></li>
+          <li><a href="services.html">Accident Repair</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="packages.html">Packages</a></li>
+          <li><a href="offers.html">Offers</a></li>
+          <li><a href="reviews.html">Reviews</a></li>
+          <li><a href="contact.html">Contact</a></li>
+          <li><a href="booking.html">Book a Service</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <div class="footer-contact-item">
+          <span class="icon">📞</span>
+          <span><a href="tel:+919008076398">+91 9008076398</a></span>
+        </div>
+        <div class="footer-contact-item">
+          <span class="icon">💬</span>
+          <span><a href="https://wa.me/916363681719">+91 6363681719</a></span>
+        </div>
+        <div class="footer-contact-item">
+          <span class="icon">✉️</span>
+          <span><a href="mailto:support@bikerclinic.com">support@bikerclinic.com</a></span>
+        </div>
+        <div class="footer-contact-item">
+          <span class="icon">📍</span>
+          <span>4th Main, 1st Phase, Nanjudaya Layout, Bangalore</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 BikerClinic. All rights reserved.</p>
+      <p>Made with ❤️ for Bangalore riders</p>
+    </div>
+  </div>
+</footer>
+
+<!-- ── FLOATING BUTTONS ───────────────────────────── -->
+<a href="https://wa.me/916363681719?text=Hi%20BikerClinic%2C%20I%20want%20to%20book%20a%20service%20for%20my%20bike." class="whatsapp-float" target="_blank" aria-label="WhatsApp">💬</a>
+<button id="scrollTop" aria-label="Scroll to top">↑</button>
+
+<script src="js/main.js"></script>
+</body>
+</html>

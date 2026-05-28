@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM Dashboard — BikerClinic Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        🏍️ BikerClinic
+      </div>
+      <nav class="sidebar-nav">
+        <a href="dashboard.html" class="nav-item active">📊 Dashboard</a>
+        <a href="../mechanic/login.html" class="nav-item">👨‍🔧 Field Tech App</a>
+        <a href="coupons.html" class="nav-item">🎫 Coupons Manager</a>
+        <a href="#" class="nav-item" onclick="alert('Coming soon in Phase 3!')">⚙️ Services Config</a>
+        <a href="#" class="nav-item" id="logoutBtn" style="margin-top:auto;color:#ef4444">🚪 Logout</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <h2 style="font-size:1.1rem;font-weight:600">Overview Dashboard</h2>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:0.85rem;color:var(--admin-muted)">Welcome, <strong>Admin</strong></span>
+          <div style="width:36px;height:36px;background:var(--admin-primary);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700">A</div>
+        </div>
+      </header>
+
+      <div class="content-area">
+        <!-- Metrics -->
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="metric-title">New Bookings</div>
+            <div class="metric-value" id="metricNew">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">In Progress</div>
+            <div class="metric-value" id="metricProgress">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Completed Today</div>
+            <div class="metric-value" id="metricCompleted">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-title">Total Customers</div>
+            <div class="metric-value" id="metricTotal">0</div>
+          </div>
+        </div>
+
+        <!-- CRM Table -->
+        <div class="table-card">
+          <div class="table-header">
+            <h3 style="font-size:1.05rem">Live Bookings Queue</h3>
+            <input type="text" id="searchInput" placeholder="Search ID or Phone..." style="padding:8px 12px;border:1px solid var(--admin-border);border-radius:6px;width:240px;outline:none">
+          </div>
+          <table class="data-table" id="bookingsTable">
+            <thead>
+              <tr>
+                <th>Booking ID</th>
+                <th>Customer</th>
+                <th>Bike</th>
+                <th>Service</th>
+                <th>Date & Time</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr>
+                <td colspan="7" style="text-align:center;padding:40px;color:var(--admin-muted)">Loading bookings...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { db, auth, IS_MOCK_MODE } from '../js/firebase-config.js';
+    import { collection, query, orderBy, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+    // 1. Auth Guard
+    if (IS_MOCK_MODE) {
+      if (!sessionStorage.getItem('bc_admin_auth')) window.location.href = 'login.html';
+    } else {
+      onAuthStateChanged(auth, user => {
+        if (!user) window.location.href = 'login.html';
+      });
+    }
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (IS_MOCK_MODE) {
+        sessionStorage.removeItem('bc_admin_auth');
+        window.location.href = 'login.html';
+      } else {
+        signOut(auth).then(() => window.location.href = 'login.html');
+      }
+    });
+
+    // 2. Fetch Data
+    const tableBody = document.getElementById('tableBody');
+    let allBookings = [];
+
+    function renderTable(data) {
+      if (data.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--admin-muted)">No bookings found today!</td></tr>`;
+        return;
+      }
+      
+      tableBody.innerHTML = '';
+      data.forEach(b => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight:600;color:var(--admin-primary)">${b.id}</td>
+          <td>
+            <div style="font-weight:600">${b.name}</div>
+            <div style="font-size:0.8rem;color:var(--admin-muted)">${b.phone}</div>
+          </td>
+          <td>${b.brand} ${b.model}</td>
+          <td>${b.package || b.service} <br><span style="font-size:0.75rem;color:var(--admin-muted);text-transform:capitalize">${b.serviceType}</span></td>
+          <td>${b.date}<br><span style="font-size:0.75rem;color:var(--admin-muted)">${b.time}</span></td>
+          <td><span class="status-badge status-${b.status.replace(' ','')}">${b.status}</span></td>
+          <td>
+            <select class="status-select" data-id="${b._docId || b.id}" data-current="${b.status}">
+              <option value="New" ${b.status === 'New' ? 'selected' : ''}>New</option>
+              <option value="Assigned" ${b.status === 'Assigned' ? 'selected' : ''}>Assign Mechanic</option>
+              <option value="In Progress" ${b.status === 'In Progress' ? 'selected' : ''}>In Progress</option>
+              <option value="Completed" ${b.status === 'Completed' ? 'selected' : ''}>Mark Completed</option>
+            </select>
+          </td>
+        `;
+        tableBody.appendChild(tr);
+      });
+
+      // Update metrics
+      document.getElementById('metricNew').textContent = data.filter(b => b.status === 'New').length;
+      document.getElementById('metricProgress').textContent = data.filter(b => b.status === 'In Progress' || b.status === 'Assigned').length;
+      document.getElementById('metricCompleted').textContent = data.filter(b => b.status === 'Completed').length;
+      document.getElementById('metricTotal').textContent = data.length;
+
+      // Status Change Listener
+      document.querySelectorAll('.status-select').forEach(sel => {
+        sel.addEventListener('change', async (e) => {
+          const newStatus = e.target.value;
+          const docId = e.target.dataset.id;
+          
+          let mechanicName = null;
+          if (newStatus === 'Assigned' || newStatus === 'In Progress') {
+            // Only prompt if moving specifically to assigned or progress
+            if (!allBookings.find(b => b.id === docId || b._docId === docId)?.assignedMechanic) {
+               mechanicName = prompt("Enter Mechanic Name (e.g. Kiran, Raju):");
+               if (mechanicName === null) {
+                 e.target.value = e.target.dataset.current; // Revert if cancelled
+                 return;
+               }
+            }
+          }
+
+          const updateData = { 
+            status: newStatus,
+            updatedAt: new Date().toISOString()
+          };
+          if (mechanicName) updateData.assignedMechanic = mechanicName;
+          
+          if (IS_MOCK_MODE) {
+            // Update in localStorage
+            let prev = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+            const idx = prev.findIndex(x => x.id === docId || x._docId === docId);
+            if(idx > -1) {
+              prev[idx] = { ...prev[idx], ...updateData };
+              localStorage.setItem('bc_bookings', JSON.stringify(prev));
+              fetchMockData(); // re-render
+            }
+          } else {
+            // Update in Firestore
+            try {
+              await updateDoc(doc(db, "bookings", docId), updateData);
+            } catch(err) { console.error("Update failed", err); }
+          }
+        });
+      });
+    }
+
+    // MOCK MODE Fetch
+    function fetchMockData() {
+      const data = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+      // Sort newest first
+      data.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      allBookings = data;
+      renderTable(allBookings);
+    }
+
+    // LIVE FIRESTORE Fetch
+    if (IS_MOCK_MODE) {
+      fetchMockData();
+      // Listen to storage events just in case
+      window.addEventListener('storage', fetchMockData);
+      // Interval to poll locally
+      setInterval(fetchMockData, 2000); 
+    } else {
+      const q = query(collection(db, "bookings"), orderBy("createdAt", "desc"));
+      onSnapshot(q, (snapshot) => {
+        allBookings = snapshot.docs.map(docSnap => ({ ...docSnap.data(), _docId: docSnap.id }));
+        renderTable(allBookings);
+      });
+    }
+
+    // Search filter
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      const filtered = allBookings.filter(b => 
+        b.id.toLowerCase().includes(term) || 
+        b.phone.includes(term) || 
+        b.name.toLowerCase().includes(term)
+      );
+      renderTable(filtered);
+    });
+
+  </script>
+</body>
+</html>

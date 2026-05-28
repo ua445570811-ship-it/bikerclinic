@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mechanic Field App — BikerClinic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #FF3D00;
+      --bg: #12121A;
+      --surface: #1A1A26;
+      --card: #212133;
+      --border: #2A2A40;
+      --text: #F8F8F8;
+      --muted: #9E9EB5;
+      --success: #00E676;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+    
+    /* App Screen */
+    #appScreen { padding-bottom: 80px; }
+    .header { background:var(--surface); padding:20px; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center; }
+    
+    .tab-bar { display:flex; padding:12px 20px; gap:12px; overflow-x:auto; background:var(--bg); border-bottom:1px solid var(--border); }
+    .tab { padding:8px 16px; border-radius:99px; font-size:0.9rem; font-weight:600; background:var(--surface); color:var(--muted); border:1px solid var(--border); white-space:nowrap; cursor:pointer;}
+    .tab.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+    .job-card { background:var(--card); margin:16px 20px; border-radius:16px; padding:20px; border:1px solid var(--border); }
+    .job-id { color:var(--primary); font-weight:700; font-size:0.85rem; letter-spacing:0.05em; margin-bottom:4px; }
+    .job-bike { font-size:1.3rem; font-weight:700; margin-bottom:4px; }
+    .job-service { color:var(--muted); font-size:0.9rem; margin-bottom:16px; }
+    
+    .job-detail { display:flex; gap:12px; margin-bottom:12px; align-items:flex-start; }
+    .job-icon { background:rgba(255,255,255,0.05); width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.9rem; flex-shrink:0; }
+    .job-text { font-size:0.9rem; margin-top:6px; line-height:1.4; color:#D0D0E0; }
+    
+    .btn { background:var(--primary); color:#fff; border:none; padding:16px; border-radius:12px; font-weight:700; font-size:1.1rem; width:100%; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+    .btn:active { opacity:0.9; transform:scale(0.98); }
+    .btn-action { margin-top:20px; background:rgba(0,230,118,0.1); color:var(--success); border:1px solid rgba(0,230,118,0.3); }
+    .btn-action.start { background:rgba(255,61,0,0.1); color:var(--primary); border:1px solid rgba(255,61,0,0.3); }
+    
+    .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+  </style>
+</head>
+<body>
+
+  <!-- App -->
+  <div id="appScreen">
+    <div class="header">
+      <div>
+        <div style="font-size:0.8rem; color:var(--muted)">Assigned Tech</div>
+        <div style="font-size:1.1rem; font-weight:700" id="headerName">...</div>
+      </div>
+      <button id="logoutBtn" style="background:transparent; border:none; color:var(--primary); font-weight:600; font-size:0.9rem; cursor:pointer;">🚪 Sign Out</button>
+    </div>
+    
+    <div class="tab-bar">
+      <div class="tab active" id="tabPending">Assigned Tasks</div>
+      <div class="tab" id="tabCompleted">Completed Today</div>
+    </div>
+
+    <div id="jobList"></div>
+  </div>
+
+  <script type="module">
+    import { db, IS_MOCK_MODE } from '../js/firebase-config.js';
+    import { collection, query, onSnapshot, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    // Auth Guard
+    let mechanicName = localStorage.getItem('bc_machanic_name');
+    if (!mechanicName) {
+      window.location.href = 'login.html';
+    } else {
+      document.getElementById('headerName').textContent = mechanicName;
+      fetchJobs();
+    }
+
+    let currentTab = 'pending';
+    let myBookings = [];
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('bc_machanic_name');
+      window.location.href = 'login.html';
+    });
+
+    // Tabs
+    document.getElementById('tabPending').addEventListener('click', () => {
+      currentTab = 'pending';
+      document.getElementById('tabPending').classList.add('active');
+      document.getElementById('tabCompleted').classList.remove('active');
+      renderJobs();
+    });
+    
+    document.getElementById('tabCompleted').addEventListener('click', () => {
+      currentTab = 'completed';
+      document.getElementById('tabCompleted').classList.add('active');
+      document.getElementById('tabPending').classList.remove('active');
+      renderJobs();
+    });
+
+    // Fetch
+    function fetchJobs() {
+      if (IS_MOCK_MODE) {
+        // Poll local storage
+        setInterval(() => {
+          const data = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+          myBookings = data.filter(b => b.assignedMechanic && b.assignedMechanic.toLowerCase() === mechanicName.toLowerCase());
+          renderJobs();
+        }, 1000);
+      } else {
+        const q = query(collection(db, "bookings"));
+        onSnapshot(q, (snapshot) => {
+          const data = snapshot.docs.map(d => ({ ...d.data(), _docId: d.id }));
+          myBookings = data.filter(b => b.assignedMechanic && b.assignedMechanic.toLowerCase() === mechanicName.toLowerCase());
+          renderJobs();
+        });
+      }
+    }
+
+    // Render
+    function renderJobs() {
+      const container = document.getElementById('jobList');
+      container.innerHTML = '';
+      
+      let filtered = [];
+      if (currentTab === 'pending') {
+        filtered = myBookings.filter(b => b.status === 'Assigned' || b.status === 'In Progress');
+      } else {
+        filtered = myBookings.filter(b => b.status === 'Completed');
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state">
+          <div style="font-size:3rem; margin-bottom:12px">🍺</div>
+          <div style="font-weight:600; font-size:1.1rem; margin-bottom:4px">No jobs here!</div>
+          <div style="font-size:0.9rem">You're all caught up for now.</div>
+        </div>`;
+        return;
+      }
+
+      filtered.forEach(b => {
+        const card = document.createElement('div');
+        card.className = 'job-card';
+        
+        let actionBtn = '';
+        if (b.status === 'Assigned') {
+           actionBtn = `<button class="btn btn-action start" onclick="updateStatus('${b.id || b._docId}', 'In Progress')">▶ Start Job</button>`;
+        } else if (b.status === 'In Progress') {
+           actionBtn = `<button class="btn btn-action" onclick="updateStatus('${b.id || b._docId}', 'Completed')">✅ Mark Completed</button>`;
+        } else if (b.status === 'Completed') {
+           actionBtn = `<div style="margin-top:16px;color:var(--success);font-weight:600;font-size:0.9rem">✅ Job Finished</div>`;
+        }
+
+        const phLink = b.phone ? `<a href="tel:${b.phone}" style="color:var(--primary);text-decoration:none">${b.phone}</a>` : 'No phone';
+
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div class="job-id">${b.id}</div>
+              <div class="job-bike">${b.brand} ${b.model}</div>
+            </div>
+            ${b.status==='In Progress' ? '<span style="background:rgba(255,61,0,0.1);color:var(--primary);padding:4px 8px;border-radius:6px;font-size:0.75rem;font-weight:700">IN PROGRESS</span>' : ''}
+          </div>
+          <div class="job-service">${b.package || b.service}</div>
+          
+          <div class="job-detail">
+            <div class="job-icon">👤</div>
+            <div class="job-text"><strong>${b.name}</strong><br>${phLink}</div>
+          </div>
+          
+          <div class="job-detail">
+            <div class="job-icon">📍</div>
+            <div class="job-text">${b.address}<br><span style="color:var(--muted);font-size:0.8rem">${b.landmark || ''}</span></div>
+          </div>
+
+          ${b.notes ? `
+          <div class="job-detail">
+            <div class="job-icon" style="background:rgba(255,255,255,0.1)">📝</div>
+            <div class="job-text" style="color:var(--primary)">${b.notes}</div>
+          </div>
+          ` : ''}
+
+          ${actionBtn}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Update Action
+    window.updateStatus = async function(id, newStatus) {
+      const updateData = {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (IS_MOCK_MODE) {
+        let prev = JSON.parse(localStorage.getItem('bc_bookings') || '[]');
+        const idx = prev.findIndex(x => x.id === id || x._docId === id);
+        if(idx > -1) {
+          prev[idx] = { ...prev[idx], ...updateData };
+          localStorage.setItem('bc_bookings', JSON.stringify(prev));
+        }
+      } else {
+        try {
+          await updateDoc(doc(db, "bookings", id), updateData);
+        } catch(e) { alert('Error updating'); }
+      }
+    };
+  </script>
+</body>
+</html>

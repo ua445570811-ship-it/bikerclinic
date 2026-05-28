@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Booking Confirmed — BikerClinic</title>
+  <meta name="description" content="Your BikerClinic service booking has been confirmed. A mechanic will contact you shortly."/>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="css/animations.css"/>
+  <style>
+    .confirm-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 120px 20px 60px; }
+    .confirm-card { max-width: 600px; width: 100%; text-align: center; }
+    .checkmark-circle {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: linear-gradient(135deg, #00E676, #00C853);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 32px; font-size: 2.8rem;
+      box-shadow: 0 0 0 16px rgba(0,230,118,0.1), 0 0 40px rgba(0,230,118,0.3);
+      animation: checkPulse 1s ease;
+    }
+    @keyframes checkPulse {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .booking-id-box {
+      display: inline-block; background: rgba(255,61,0,0.1); border: 1.5px dashed rgba(255,61,0,0.4);
+      border-radius: var(--radius-md); padding: 12px 24px; font-family: monospace;
+      font-size: 1.3rem; font-weight: 700; color: var(--primary); letter-spacing: 0.15em;
+      margin: 20px 0;
+    }
+    .next-steps { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px; margin-top: 32px; text-align: left; }
+    .next-step-item { display: flex; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .next-step-item:last-child { border-bottom: none; }
+    .step-icon-circle { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,61,0,0.1); border: 1.5px solid rgba(255,61,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .confetti { position: fixed; top: 0; left: 0; width: 100%; pointer-events: none; z-index: 9999; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar scrolled">
+  <a href="index.html" class="nav-logo">
+    <div class="logo-icon">🏍️</div>
+    <span>Biker<em>Clinic</em></span>
+  </a>
+  <div class="nav-actions">
+    <a href="index.html" class="btn btn-ghost btn-sm">← Home</a>
+    <a href="booking.html" class="btn btn-primary btn-sm">Book Again</a>
+  </div>
+</nav>
+
+<div class="confirm-page">
+  <div class="confirm-card anim-fade-up">
+    <div class="checkmark-circle">✅</div>
+    <h1 style="font-size:2rem;margin-bottom:12px">Booking Confirmed!</h1>
+    <p id="confirmMsg">Your bike service has been booked successfully. Our team will contact you within 30 minutes.</p>
+
+    <div class="booking-id-box" id="bookingIdDisplay">BC000000</div>
+    <p style="font-size:0.82rem;color:var(--text-muted)">Save this booking ID for reference</p>
+
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:28px;flex-wrap:wrap">
+      <a id="trackBtn" href="#" class="btn btn-primary">📍 Track Live Status</a>
+      <a id="waShareBtn" href="#" class="btn btn-outline" target="_blank">💬 Chat on WhatsApp</a>
+    </div>
+
+    <!-- Next steps -->
+    <div class="next-steps">
+      <h3 style="margin-bottom:20px;font-size:1rem">📋 What Happens Next?</h3>
+      <div class="next-step-item">
+        <div class="step-icon-circle">📞</div>
+        <div>
+          <strong>Confirmation Call</strong>
+          <p style="font-size:0.85rem;margin-top:4px">Our team will call you within 30 minutes to confirm the slot and mechanic.</p>
+        </div>
+      </div>
+      <div class="next-step-item">
+        <div class="step-icon-circle">🏍️</div>
+        <div>
+          <strong>Mechanic Dispatched</strong>
+          <p style="font-size:0.85rem;margin-top:4px">A certified mechanic will be assigned and will arrive at your location on time.</p>
+        </div>
+      </div>
+      <div class="next-step-item">
+        <div class="step-icon-circle">🔧</div>
+        <div>
+          <strong>Service &amp; Report</strong>
+          <p style="font-size:0.85rem;margin-top:4px">Your bike gets serviced and you'll receive a detailed service report with parts used.</p>
+        </div>
+      </div>
+      <div class="next-step-item">
+        <div class="step-icon-circle">💳</div>
+        <div>
+          <strong>Payment After Service</strong>
+          <p style="font-size:0.85rem;margin-top:4px">Pay only after the service is done — cash, UPI, or card accepted.</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:32px;padding:16px;background:rgba(37,211,102,0.06);border:1px solid rgba(37,211,102,0.2);border-radius:var(--radius-md)">
+      <p style="font-size:0.85rem;color:var(--text-secondary)">
+        📞 Need to change or cancel? Call us at <a href="tel:+919008076398" style="color:var(--primary)">+91 9008076398</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<canvas class="confetti" id="confettiCanvas"></canvas>
+<script src="js/main.js"></script>
+<script>
+  // Read URL params
+  const p = new URLSearchParams(location.search);
+  const id = p.get('id') || 'BC' + Date.now().toString().slice(-6);
+  const name = p.get('name') || '';
+  const service = p.get('service') || 'Bike Service';
+
+  document.getElementById('bookingIdDisplay').textContent = id;
+  if (name) document.getElementById('confirmMsg').textContent =
+    `Hi ${name}! Your ${service} has been booked. Our team will contact you within 30 minutes.`;
+
+  const waMsg = `Hi BikerClinic! My booking ID is *${id}* for *${service}*. Please confirm.`;
+  document.getElementById('waShareBtn').href = `https://wa.me/916363681719?text=${encodeURIComponent(waMsg)}`;
+  document.getElementById('trackBtn').href = `track.html?id=${id}`;
+
+  // Simple confetti
+  (function confetti() {
+    const canvas = document.getElementById('confettiCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const colors = ['#FF3D00','#FFD600','#00E676','#FF6E40','#fff'];
+    const pieces = Array.from({length: 80}, () => ({
+      x: Math.random() * canvas.width, y: -10,
+      r: Math.random() * 6 + 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 4, vy: Math.random() * 3 + 2,
+      angle: Math.random() * Math.PI * 2, va: (Math.random() - 0.5) * 0.2
+    }));
+    let frame = 0;
+    const max = 120;
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      pieces.forEach(p => {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+        ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, 1 - frame / max);
+        ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r);
+        ctx.restore();
+        p.x += p.vx; p.y += p.vy; p.angle += p.va;
+      });
+      frame++;
+      if (frame < max) requestAnimationFrame(draw);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    setTimeout(draw, 400);
+  })();
+</script>
+</body>
+</html>
