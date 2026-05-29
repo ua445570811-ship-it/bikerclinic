@@ -28,9 +28,14 @@ export default function UserLogin() {
       if (IS_MOCK_MODE) {
         // Fallback Mock Mode
         await new Promise((r) => setTimeout(r, 900));
+        localStorage.setItem("bc_user_uid", "mock-user-123");
         localStorage.setItem("bc_user_email", "rider@example.com");
         localStorage.setItem("bc_user_name", "Demo Rider");
         localStorage.setItem("bc_user_phone", "9606538417");
+        localStorage.setItem("bc_user_address", "123 Rider Street, Bangalore");
+        localStorage.setItem("bc_user_bike_brand", "Royal Enfield");
+        localStorage.setItem("bc_user_bike_model", "Classic 350");
+        localStorage.setItem("bc_user_bike_number", "KA 03 EX 1234");
         router.push("/user/dashboard");
       } else {
         const provider = new GoogleAuthProvider();
@@ -43,9 +48,14 @@ export default function UserLogin() {
           
           if (userDocSnap.exists() && userDocSnap.data().phone) {
             const userData = userDocSnap.data();
+            localStorage.setItem("bc_user_uid", user.uid);
             localStorage.setItem("bc_user_email", user.email);
             localStorage.setItem("bc_user_name", userData.name || user.displayName || "");
             localStorage.setItem("bc_user_phone", userData.phone);
+            localStorage.setItem("bc_user_address", userData.address || "");
+            localStorage.setItem("bc_user_bike_brand", userData.bikeBrand || "");
+            localStorage.setItem("bc_user_bike_model", userData.bikeModel || "");
+            localStorage.setItem("bc_user_bike_number", userData.bikeNumber || "");
             router.push("/user/dashboard");
           } else {
             // Switch to phone stage
@@ -80,9 +90,14 @@ export default function UserLogin() {
     setError("");
     try {
       if (IS_MOCK_MODE) {
+        localStorage.setItem("bc_user_uid", "mock-user-123");
         localStorage.setItem("bc_user_email", tempUser.email);
         localStorage.setItem("bc_user_name", tempUser.name);
         localStorage.setItem("bc_user_phone", phone);
+        localStorage.setItem("bc_user_address", "");
+        localStorage.setItem("bc_user_bike_brand", "");
+        localStorage.setItem("bc_user_bike_model", "");
+        localStorage.setItem("bc_user_bike_number", "");
         router.push("/user/dashboard");
       } else {
         // Save user profile to Firestore
@@ -95,9 +110,14 @@ export default function UserLogin() {
           updatedAt: new Date().toISOString()
         });
 
+        localStorage.setItem("bc_user_uid", tempUser.uid);
         localStorage.setItem("bc_user_email", tempUser.email);
         localStorage.setItem("bc_user_name", tempUser.name);
         localStorage.setItem("bc_user_phone", phone);
+        localStorage.setItem("bc_user_address", "");
+        localStorage.setItem("bc_user_bike_brand", "");
+        localStorage.setItem("bc_user_bike_model", "");
+        localStorage.setItem("bc_user_bike_number", "");
         router.push("/user/dashboard");
       }
     } catch (err: any) {

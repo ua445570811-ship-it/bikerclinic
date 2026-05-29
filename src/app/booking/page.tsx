@@ -43,12 +43,18 @@ export default function BookingPage() {
     const savedName = localStorage.getItem("bc_user_name") || "";
     const savedEmail = localStorage.getItem("bc_user_email") || "";
     const savedPhone = localStorage.getItem("bc_user_phone") || "";
-    if (savedName || savedEmail || savedPhone) {
+    const savedAddress = localStorage.getItem("bc_user_address") || "";
+    const savedBrand = localStorage.getItem("bc_user_bike_brand") || "";
+    const savedModel = localStorage.getItem("bc_user_bike_model") || "";
+    if (savedName || savedEmail || savedPhone || savedAddress || savedBrand || savedModel) {
       setForm(f => ({
         ...f,
         name: f.name || savedName,
         email: f.email || savedEmail,
         phone: f.phone || savedPhone,
+        address: f.address || savedAddress,
+        brand: f.brand || savedBrand,
+        model: f.model || savedModel,
       }));
     }
   }, []);
