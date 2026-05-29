@@ -1,13 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, IS_MOCK_MODE } from "@/lib/firebase";
+import { db, auth, IS_MOCK_MODE } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 
 export default function UserLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<"login" | "phone">("login");
+  const [phone, setPhone] = useState("");
+  const [tempUser, setTempUser] = useState<{ uid: string; email: string; name: string } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -33,10 +37,25 @@ export default function UserLogin() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         if (user.email) {
-          localStorage.setItem("bc_user_email", user.email);
-          localStorage.setItem("bc_user_name", user.displayName || "");
-          localStorage.setItem("bc_user_phone", user.phoneNumber || "");
-          router.push("/user/dashboard");
+          // Check if user already exists in Firestore 'users' collection
+          const userDocRef = doc(db, "users", user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          
+          if (userDocSnap.exists() && userDocSnap.data().phone) {
+            const userData = userDocSnap.data();
+            localStorage.setItem("bc_user_email", user.email);
+            localStorage.setItem("bc_user_name", userData.name || user.displayName || "");
+            localStorage.setItem("bc_user_phone", userData.phone);
+            router.push("/user/dashboard");
+          } else {
+            // Switch to phone stage
+            setTempUser({
+              uid: user.uid,
+              email: user.email,
+              name: user.displayName || ""
+            });
+            setStage("phone");
+          }
         } else {
           throw new Error("No email associated with this Google account.");
         }
@@ -44,6 +63,46 @@ export default function UserLogin() {
     } catch (err: any) {
       console.error("Error during Google sign-in:", err);
       setError(err.message || "Failed to sign in with Google. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (phone.length !== 10) {
+      setError("Please enter a valid 10-digit phone number.");
+      return;
+    }
+    if (!tempUser) return;
+
+    setLoading(true);
+    setError("");
+    try {
+      if (IS_MOCK_MODE) {
+        localStorage.setItem("bc_user_email", tempUser.email);
+        localStorage.setItem("bc_user_name", tempUser.name);
+        localStorage.setItem("bc_user_phone", phone);
+        router.push("/user/dashboard");
+      } else {
+        // Save user profile to Firestore
+        await setDoc(doc(db, "users", tempUser.uid), {
+          uid: tempUser.uid,
+          email: tempUser.email,
+          name: tempUser.name,
+          phone: phone,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+
+        localStorage.setItem("bc_user_email", tempUser.email);
+        localStorage.setItem("bc_user_name", tempUser.name);
+        localStorage.setItem("bc_user_phone", phone);
+        router.push("/user/dashboard");
+      }
+    } catch (err: any) {
+      console.error("Error saving phone number:", err);
+      setError(err.message || "Failed to complete registration. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -65,37 +124,92 @@ export default function UserLogin() {
 
         <div style={styles.divider} />
 
-        <h1 style={styles.heading}>Welcome Back, Rider!</h1>
-        <p style={styles.subheading}>Sign in to view your bookings, track live service status, and manage your garage.</p>
+        {stage === "login" ? (
+          <>
+            <h1 style={styles.heading}>Welcome Back, Rider!</h1>
+            <p style={styles.subheading}>Sign in to view your bookings, track live service status, and manage your garage.</p>
 
-        {IS_MOCK_MODE && (
-          <div style={styles.otpSentBadge}>
-            💡 Firebase is in Demo Mode. Clicking the Google button will log you in with a demo account instantly.
-          </div>
+            {IS_MOCK_MODE && (
+              <div style={styles.otpSentBadge}>
+                💡 Firebase is in Demo Mode. Clicking the Google button will log you in with a demo account instantly.
+              </div>
+            )}
+
+            {error && <div style={styles.errorMsg}>{error}</div>}
+
+            <button
+              onClick={handleGoogleLogin}
+              style={{ ...styles.submitBtn, opacity: loading ? 0.7 : 1 }}
+              disabled={loading}
+            >
+              {loading ? (
+                <span style={styles.spinner} />
+              ) : (
+                <>
+                  {/* Inline SVG Google Icon */}
+                  <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: 10 }}>
+                    <path fill="#EA4335" d="M12 5.04c1.67 0 3.17.58 4.35 1.71l3.25-3.25C17.63 1.63 15.01 1 12 1 7.37 1 3.4 3.66 1.48 7.55l3.86 3C6.26 7.56 8.9 5.04 12 5.04z" />
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.44c-.28 1.47-1.11 2.71-2.35 3.55l3.65 2.83c2.13-1.97 3.75-4.87 3.75-8.48z" />
+                    <path fill="#FBBC05" d="M5.34 14.75c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29L1.48 7.17C.54 9.07 0 11.19 0 13.4s.54 4.33 1.48 6.23l3.86-2.88z" />
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.65-2.83c-1.01.68-2.31 1.08-4.31 1.08-3.1 0-5.74-2.52-6.66-5.51L1.48 16.7C3.4 20.59 7.37 23 12 23z" />
+                  </svg>
+                  Sign In with Google
+                </>
+              )}
+            </button>
+          </>
+        ) : (
+          <>
+            <h1 style={styles.heading}>One Last Step!</h1>
+            <p style={styles.subheading}>Please enter your mobile number to complete your garage registration.</p>
+
+            {error && <div style={styles.errorMsg}>{error}</div>}
+
+            <form onSubmit={handlePhoneSubmit}>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#9E9EB5", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Mobile Number</label>
+                <div style={styles.phoneRow}>
+                  <div style={styles.countryCode}>🇮🇳 +91</div>
+                  <input
+                    type="tel"
+                    style={{
+                      width: "100%",
+                      background: "#0E0E18",
+                      border: "1px solid #2A2A3E",
+                      borderRadius: "12px",
+                      padding: "13px 14px",
+                      paddingLeft: 88,
+                      color: "#F0F0F8",
+                      fontSize: "0.95rem",
+                      outline: "none"
+                    }}
+                    placeholder="9876543210"
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setError(""); }}
+                    maxLength={10}
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                style={{ ...styles.submitBtn, background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", opacity: loading ? 0.7 : 1 }}
+                disabled={loading}
+              >
+                {loading ? <span style={{ ...styles.spinner, borderTopColor: "#fff", borderLeftColor: "#fff" }} /> : "Complete Registration →"}
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => { setStage("login"); setTempUser(null); setPhone(""); }}
+                style={styles.backBtn}
+              >
+                ← Back
+              </button>
+            </form>
+          </>
         )}
-
-        {error && <div style={styles.errorMsg}>{error}</div>}
-
-        <button
-          onClick={handleGoogleLogin}
-          style={{ ...styles.submitBtn, opacity: loading ? 0.7 : 1 }}
-          disabled={loading}
-        >
-          {loading ? (
-            <span style={styles.spinner} />
-          ) : (
-            <>
-              {/* Inline SVG Google Icon */}
-              <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: 10 }}>
-                <path fill="#EA4335" d="M12 5.04c1.67 0 3.17.58 4.35 1.71l3.25-3.25C17.63 1.63 15.01 1 12 1 7.37 1 3.4 3.66 1.48 7.55l3.86 3C6.26 7.56 8.9 5.04 12 5.04z" />
-                <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.44c-.28 1.47-1.11 2.71-2.35 3.55l3.65 2.83c2.13-1.97 3.75-4.87 3.75-8.48z" />
-                <path fill="#FBBC05" d="M5.34 14.75c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29L1.48 7.17C.54 9.07 0 11.19 0 13.4s.54 4.33 1.48 6.23l3.86-2.88z" />
-                <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.65-2.83c-1.01.68-2.31 1.08-4.31 1.08-3.1 0-5.74-2.52-6.66-5.51L1.48 16.7C3.4 20.59 7.37 23 12 23z" />
-              </svg>
-              Sign In with Google
-            </>
-          )}
-        </button>
 
         <div style={styles.footer}>
           <a href="/" style={styles.footerLink}>← Back to Site</a>
@@ -177,6 +291,24 @@ const styles: Record<string, React.CSSProperties> = {
   },
   heading: { fontSize: "1.6rem", fontWeight: 700, marginBottom: 8 },
   subheading: { color: "#6B6B88", fontSize: "0.9rem", marginBottom: 28, lineHeight: 1.5 },
+  phoneRow: { position: "relative", display: "flex", width: "100%" },
+  countryCode: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 72,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 700,
+    fontSize: "0.9rem",
+    zIndex: 2,
+    pointerEvents: "none",
+    borderRight: "1px solid #2A2A3E",
+    color: "#B0B0C8",
+    borderRadius: "12px 0 0 12px",
+  },
   otpSentBadge: {
     background: "rgba(99,102,241,0.1)",
     border: "1px solid rgba(99,102,241,0.2)",
