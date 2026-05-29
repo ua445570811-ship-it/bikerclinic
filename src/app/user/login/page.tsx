@@ -43,11 +43,35 @@ export default function UserLogin() {
         const user = result.user;
         if (user.email) {
           // Check if user already exists in Firestore 'users' collection
-          const userDocRef = doc(db, "users", user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          
-          if (userDocSnap.exists() && userDocSnap.data().phone) {
-            const userData = userDocSnap.data();
+          let userData: any = null;
+          let userExists = false;
+
+          try {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists() && userDocSnap.data().phone) {
+              userData = userDocSnap.data();
+              userExists = true;
+            }
+          } catch (firestoreErr) {
+            console.warn("Firestore getDoc failed (possibly offline):", firestoreErr);
+            // Fallback to local storage
+            const cachedEmail = localStorage.getItem("bc_user_email");
+            const cachedPhone = localStorage.getItem("bc_user_phone");
+            if (cachedEmail === user.email && cachedPhone) {
+              userData = {
+                name: localStorage.getItem("bc_user_name") || user.displayName || "",
+                phone: cachedPhone,
+                address: localStorage.getItem("bc_user_address") || "",
+                bikeBrand: localStorage.getItem("bc_user_bike_brand") || "",
+                bikeModel: localStorage.getItem("bc_user_bike_model") || "",
+                bikeNumber: localStorage.getItem("bc_user_bike_number") || "",
+              };
+              userExists = true;
+            }
+          }
+
+          if (userExists && userData) {
             localStorage.setItem("bc_user_uid", user.uid);
             localStorage.setItem("bc_user_email", user.email);
             localStorage.setItem("bc_user_name", userData.name || user.displayName || "");
@@ -100,15 +124,19 @@ export default function UserLogin() {
         localStorage.setItem("bc_user_bike_number", "");
         router.push("/user/dashboard");
       } else {
-        // Save user profile to Firestore
-        await setDoc(doc(db, "users", tempUser.uid), {
-          uid: tempUser.uid,
-          email: tempUser.email,
-          name: tempUser.name,
-          phone: phone,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
+        try {
+          // Save user profile to Firestore
+          await setDoc(doc(db, "users", tempUser.uid), {
+            uid: tempUser.uid,
+            email: tempUser.email,
+            name: tempUser.name,
+            phone: phone,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        } catch (firestoreErr) {
+          console.warn("Firestore setDoc failed (offline), caching locally:", firestoreErr);
+        }
 
         localStorage.setItem("bc_user_uid", tempUser.uid);
         localStorage.setItem("bc_user_email", tempUser.email);
