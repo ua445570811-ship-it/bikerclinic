@@ -2,6 +2,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { db, IS_MOCK_MODE } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 type Booking = {
   id: string;
@@ -54,8 +56,30 @@ function TrackContent() {
     // Simulate network delay for premium feel
     await new Promise((r) => setTimeout(r, 600));
 
-    const allBookings: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    const found = allBookings.find((b) => b.id === bId);
+    let found: Booking | null = null;
+
+    if (!IS_MOCK_MODE) {
+      try {
+        const q = query(collection(db, "bookings"), where("id", "==", bId));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const docSnap = snap.docs[0];
+          const data = docSnap.data();
+          found = { ...data, id: data.id || docSnap.id } as Booking;
+        }
+      } catch (err) {
+        console.error("Error querying Firestore in track page:", err);
+      }
+    }
+
+    // Fallback/Mock mode lookup
+    if (!found) {
+      const allBookings: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+      const localFound = allBookings.find((b) => b.id === bId);
+      if (localFound) {
+        found = localFound;
+      }
+    }
 
     setLoading(false);
     if (found) {
@@ -103,220 +127,189 @@ function TrackContent() {
     }
   };
 
-  return (
-    <div style={s.container}>
-      {/* Search Section */}
-      <section style={s.hero}>
-        <div style={s.glowPurple} />
-        <div style={s.glowRed} />
-        <div style={s.heroContent}>
-          <div style={s.heroBadge}>📍 Live status</div>
-          <h1 style={s.heroH1}>Track Your Service</h1>
-          <p style={s.heroSub}>
-            Enter your BikerClinic Booking ID to see real-time updates of your bike servicing.
-          </p>
+  const steps = [
+    { name: "New", title: "Booking Received", desc: "We have received your request and are assigning a technician." },
+    { name: "Assigned", title: "Mechanic Assigned", desc: booking?.assignedMechanic ? `Technician ${booking.assignedMechanic.split("@")[0]} has been assigned to your service.` : "A technician has been assigned to your service." },
+    { name: "In Progress", title: "Service In Progress", desc: "Our mechanic is working on your vehicle right now." },
+    { name: "Completed", title: "Completed ✅", desc: "Service completed. Hope you have a great ride!" },
+  ];
 
-          <form onSubmit={handleSubmit} className="track-search-form" style={s.searchBox}>
+  return (
+    <div style={s.page}>
+      {/* Nav */}
+      <nav style={s.nav}>
+        <Link href="/" style={s.logo}>🏍️ Biker<span style={{ color: "#FF3D00" }}>Clinic</span></Link>
+        <Link href="/user/dashboard" style={s.navLink}>👤 My Garage</Link>
+      </nav>
+
+      <div style={s.container}>
+        <div style={s.trackBox}>
+          <h1 style={s.title}>Track Your Service</h1>
+          <p style={s.subtitle}>Enter your Booking ID (e.g. BC123456) to check the live status of your bike service.</p>
+
+          <form onSubmit={handleSubmit} style={s.form}>
             <input
-              type="text"
+              style={s.input}
               placeholder="e.g. BC123456"
               value={searchId}
               onChange={(e) => setSearchId(e.target.value.toUpperCase())}
-              style={s.searchInput}
-              required
             />
-            <button type="submit" style={s.searchBtn}>
-              {loading ? "Searching..." : "Track Bike"}
+            <button type="submit" disabled={loading} style={s.button}>
+              {loading ? "Searching..." : "Track Status"}
             </button>
           </form>
 
           {errorMsg && <div style={s.error}>{errorMsg}</div>}
         </div>
-      </section>
 
-      {/* Tracker Card */}
-      {searched && booking && (
-        <section style={s.trackerSection} className="anim-fade-up">
-          <div className="booking-card" style={s.trackerCard}>
-            <div style={s.bikeHeader}>
+        {/* Loading Spinner */}
+        {loading && (
+          <div style={s.loadingBox}>
+            <div style={s.spinner} />
+            <p style={{ color: "#6B6B88", fontSize: "0.9rem" }}>Connecting to Garage Live Link...</p>
+          </div>
+        )}
+
+        {/* Results Card */}
+        {booking && !loading && (
+          <div style={s.resultCard} className="anim-fade-up">
+            {/* Header */}
+            <div style={s.cardHeader}>
               <div>
-                <h3 style={s.bikeTitle}>
-                  {booking.brand} {booking.model}
-                </h3>
-                <p style={s.bikeDetails}>
-                  Customer: <strong>{booking.name}</strong> · {booking.service}{booking.package ? ` (${booking.package})` : ""}
-                </p>
+                <div style={s.bookingBadge}>ACTIVE BOOKING</div>
+                <h2 style={s.bikeName}>{booking.brand} {booking.model}</h2>
               </div>
-              <div style={s.statusBadge}>
-                STATUS: {booking.status.toUpperCase()}
+              <div style={s.bookingId}>{booking.id}</div>
+            </div>
+
+            {/* Info Grid */}
+            <div style={s.infoGrid}>
+              <div style={s.infoCol}>
+                <span style={s.infoLabel}>Service Request</span>
+                <span style={s.infoText}>{booking.service}{booking.package ? ` (${booking.package})` : ""}</span>
+              </div>
+              <div style={s.infoCol}>
+                <span style={s.infoLabel}>Service Type</span>
+                <span style={{ ...s.infoText, textTransform: "capitalize" }}>{booking.serviceType}</span>
+              </div>
+              <div style={s.infoCol}>
+                <span style={s.infoLabel}>Scheduled Date</span>
+                <span style={s.infoText}>{booking.date} at {booking.time}</span>
+              </div>
+              <div style={s.infoCol}>
+                <span style={s.infoLabel}>Assigned Mechanic</span>
+                <span style={{ ...s.infoText, color: booking.assignedMechanic ? "#00E676" : "#6B6B88" }}>
+                  {booking.assignedMechanic ? `👨‍🔧 ${booking.assignedMechanic.split("@")[0]}` : "Assigning..."}
+                </span>
               </div>
             </div>
 
-            <div style={s.timelineContainer}>
-              {/* Timeline Vertical Progress Line */}
-              <div style={s.timelineLine}>
-                <div style={{ ...s.timelineLineProgress, height: getProgressHeight() }} />
-              </div>
+            {/* Timeline */}
+            <div style={s.timelineBox}>
+              <h3 style={s.timelineTitle}>Live Progress</h3>
 
-              {/* Step 1: New */}
-              <div style={s.timelineItem}>
-                <div style={{ ...s.timelineDot, ...s[getTimelineStatus("New") + "Dot"] }} />
-                <div style={{ ...s.timelineContent, opacity: getTimelineStatus("New") !== "pending" ? 1 : 0.5 }}>
-                  <h4 style={{ ...s.timelineTitle, color: getTimelineStatus("New") === "active" ? "#FF3D00" : "#F0F0F8" }}>
-                    Booking Confirmed
-                  </h4>
-                  <p style={s.timelineDesc}>
-                    {booking.createdAt ? `Confirmed at ${formatTime(booking.createdAt)}` : "Waiting for assignment"}
-                  </p>
+              <div style={s.timeline}>
+                {/* Progress bar line */}
+                <div style={s.timelineLine}>
+                  <div style={{ ...s.timelineLineFill, height: getProgressHeight() }} />
                 </div>
-              </div>
 
-              {/* Step 2: Assigned */}
-              <div style={s.timelineItem}>
-                <div style={{ ...s.timelineDot, ...s[getTimelineStatus("Assigned") + "Dot"] }} />
-                <div style={{ ...s.timelineContent, opacity: getTimelineStatus("Assigned") !== "pending" ? 1 : 0.5 }}>
-                  <h4 style={{ ...s.timelineTitle, color: getTimelineStatus("Assigned") === "active" ? "#FF3D00" : "#F0F0F8" }}>
-                    Mechanic Assigned
-                  </h4>
-                  <p style={s.timelineDesc}>
-                    {getTimelineStatus("Assigned") !== "pending" && booking.updatedAt
-                      ? `Mechanic assigned at ${formatTime(booking.updatedAt)}`
-                      : "A certified technician will be assigned shortly"}
-                  </p>
-
-                  {booking.assignedMechanic && getTimelineStatus("Assigned") !== "pending" && (
-                    <div style={s.mechanicCard}>
-                      <div style={s.mechanicAvatar}>👨‍🔧</div>
-                      <div>
-                        <div style={s.mechanicName}>{booking.assignedMechanic}</div>
-                        <div style={s.mechanicLabel}>Certified BikerClinic Specialist</div>
+                {/* Steps */}
+                {steps.map((st) => {
+                  const state = getTimelineStatus(st.name);
+                  return (
+                    <div key={st.name} style={s.stepRow}>
+                      <div
+                        style={{
+                          ...s.stepDot,
+                          ...(state === "active" ? s.dotActive : state === "past" ? s.dotPast : {}),
+                        }}
+                      >
+                        {state === "past" && "✓"}
+                      </div>
+                      <div style={s.stepContent}>
+                        <h4
+                          style={{
+                            ...s.stepTitleText,
+                            color: state === "active" ? "#FF3D00" : state === "past" ? "#F0F0F8" : "#6B6B88",
+                          }}
+                        >
+                          {st.title}
+                        </h4>
+                        <p style={s.stepDesc}>{st.desc}</p>
+                        {state === "active" && booking.updatedAt && (
+                          <span style={s.updateTime}>Last updated at {formatTime(booking.updatedAt)}</span>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Step 3: In Progress */}
-              <div style={s.timelineItem}>
-                <div style={{ ...s.timelineDot, ...s[getTimelineStatus("In Progress") + "Dot"] }} />
-                <div style={{ ...s.timelineContent, opacity: getTimelineStatus("In Progress") !== "pending" ? 1 : 0.5 }}>
-                  <h4 style={{ ...s.timelineTitle, color: getTimelineStatus("In Progress") === "active" ? "#FF3D00" : "#F0F0F8" }}>
-                    Service In Progress
-                  </h4>
-                  <p style={s.timelineDesc}>
-                    {getTimelineStatus("In Progress") !== "pending" && booking.updatedAt
-                      ? `Work started at ${formatTime(booking.updatedAt)}`
-                      : "We perform a comprehensive 35-point inspection and complete the servicing"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 4: Completed */}
-              <div style={s.timelineItem}>
-                <div style={{ ...s.timelineDot, ...s[getTimelineStatus("Completed") + "Dot"] }} />
-                <div style={{ ...s.timelineContent, opacity: getTimelineStatus("Completed") !== "pending" ? 1 : 0.5 }}>
-                  <h4 style={{ ...s.timelineTitle, color: getTimelineStatus("Completed") === "active" ? "#FF3D00" : "#F0F0F8" }}>
-                    Ready & Delivered
-                  </h4>
-                  <p style={s.timelineDesc}>
-                    {getTimelineStatus("Completed") === "active"
-                      ? `Servicing finished and bike delivered successfully!`
-                      : "Your bike will be delivered and pay-after-service is finalized"}
-                  </p>
-                </div>
+                  );
+                })}
               </div>
             </div>
           </div>
-        </section>
-      )}
+        )}
+
+        {searched && !booking && !loading && !errorMsg && (
+          <div style={s.empty}>
+            <p>Enter a Booking ID to see details</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function TrackingPage() {
+export default function TrackPage() {
   return (
-    <div style={s.page}>
-      {/* Navigation */}
-      <nav style={s.nav}>
-        <div style={s.navInner}>
-          <Link href="/" style={s.logo}>
-            🏍️ Biker<span style={{ color: "#FF3D00" }}>Clinic</span>
-          </Link>
-          <div style={s.navLinks}>
-            <Link href="/booking" style={s.navLink}>
-              Book Now
-            </Link>
-            <Link href="/user/login" style={s.navLinkGhost}>
-              👤 My Garage
-            </Link>
-          </div>
+    <Suspense fallback={
+      <div style={s.page}>
+        <div style={s.loadingBox}>
+          <div style={s.spinner} />
+          <p style={{ color: "#6B6B88", fontSize: "0.9rem" }}>Loading tracking module...</p>
         </div>
-      </nav>
-
-      {/* Main Track Logic wrapped in Suspense for search params */}
-      <Suspense fallback={<div style={s.loadingContainer}>Loading tracking details...</div>}>
-        <TrackContent />
-      </Suspense>
-
-      {/* Footer */}
-      <footer style={s.footer}>
-        <div style={s.footerInner}>
-          <div style={s.logo}>
-            🏍️ Biker<span style={{ color: "#FF3D00" }}>Clinic</span>
-          </div>
-          <p style={s.footerCopy}>© 2025 BikerClinic. Bangalore, India.</p>
-        </div>
-      </footer>
-    </div>
+      </div>
+    }>
+      <TrackContent />
+    </Suspense>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
-  page: { background: "#0E0E18", minHeight: "100vh", display: "flex", flexDirection: "column" },
-  nav: { position: "sticky", top: 0, zIndex: 100, padding: "20px 0", background: "rgba(10,10,20,0.95)", backdropFilter: "blur(16px)", borderBottom: "1px solid #1E1E2E" },
-  navInner: { maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", justifyContent: "space-between", alignItems: "center" },
-  logo: { fontSize: "1.3rem", fontWeight: 800, textDecoration: "none", color: "#F0F0F8" },
-  navLinks: { display: "flex", alignItems: "center", gap: 20 },
-  navLink: { color: "#B0B0C8", fontSize: "0.9rem", fontWeight: 500, textDecoration: "none" },
-  navLinkGhost: { color: "#B0B0C8", fontSize: "0.9rem", fontWeight: 500, textDecoration: "none", border: "1px solid #2A2A3E", padding: "8px 16px", borderRadius: 8 },
-  loadingContainer: { display: "flex", alignItems: "center", justifyContent: "center", flex: 1, color: "#B0B0C8", fontSize: "1.1rem" },
-  container: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 80 },
-  hero: { width: "100%", padding: "100px 24px 60px", position: "relative", overflow: "hidden", display: "flex", justifyContent: "center", borderBottom: "1px solid #1E1E2E" },
-  glowPurple: { position: "absolute", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)", top: -200, right: -100, pointerEvents: "none" },
-  glowRed: { position: "absolute", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,61,0,0.04) 0%, transparent 70%)", bottom: -200, left: -100, pointerEvents: "none" },
-  heroContent: { textAlign: "center", maxWidth: 640, position: "relative", zIndex: 1 },
-  heroBadge: { display: "inline-block", background: "rgba(255,61,0,0.1)", border: "1px solid rgba(255,61,0,0.2)", color: "#FF3D00", padding: "6px 16px", borderRadius: 99, fontSize: "0.8rem", fontWeight: 700, marginBottom: 16, letterSpacing: "0.05em", textTransform: "uppercase" },
-  heroH1: { fontSize: "clamp(2rem, 5vw, 3rem)", fontWeight: 900, marginBottom: 14, letterSpacing: "-0.02em" },
-  heroSub: { color: "#9E9EB5", fontSize: "1.05rem", lineHeight: 1.6, marginBottom: 32 },
-  searchBox: { display: "flex", width: "100%", maxWidth: 500, margin: "0 auto", background: "#161622", border: "1px solid #2A2A3E", borderRadius: 99, padding: 6, boxShadow: "0 4px 20px rgba(0,0,0,0.3)" },
-  searchInput: { flex: 1, background: "transparent", border: "none", padding: "12px 20px", fontSize: "1rem", color: "#F0F0F8", outline: "none" },
-  searchBtn: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", padding: "12px 28px", borderRadius: 99, fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", transition: "opacity 0.2s" },
-  error: { color: "#EF4444", fontSize: "0.9rem", marginTop: 16, fontWeight: 600 },
-  trackerSection: { width: "100%", maxWidth: 800, padding: "60px 24px 0", boxSizing: "border-box" },
-  trackerCard: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 20, padding: "40px", boxShadow: "0 8px 40px rgba(0,0,0,0.4)" },
-  bikeHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 24, borderBottom: "1px solid #2A2A3E", marginBottom: 36, flexWrap: "wrap", gap: 16 },
-  bikeTitle: { fontSize: "1.4rem", fontWeight: 800, color: "#F0F0F8" },
-  bikeDetails: { color: "#6B6B88", fontSize: "0.9rem", marginTop: 4 },
-  statusBadge: { background: "rgba(255,61,0,0.1)", border: "1px solid rgba(255,61,0,0.2)", color: "#FF3D00", padding: "8px 16px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 800, letterSpacing: "0.05em" },
-  timelineContainer: { position: "relative", paddingLeft: 36 },
-  timelineLine: { position: "absolute", left: 11, top: 12, bottom: 24, width: 2, background: "#2A2A3E" },
-  timelineLineProgress: { position: "absolute", top: 0, left: 0, width: "100%", background: "linear-gradient(to bottom, #00E676, #FF3D00)", transition: "height 0.6s cubic-bezier(0.4, 0, 0.2, 1)" },
-  timelineItem: { position: "relative", marginBottom: 36, display: "flex", gap: 16 },
-  timelineDot: { position: "absolute", left: -36, top: 4, width: 24, height: 24, borderRadius: "50%", background: "#161622", border: "4px solid #2A2A3E", boxSizing: "border-box", zIndex: 2, transition: "all 0.3s ease" },
-  timelineContent: { display: "flex", flexDirection: "column", transition: "opacity 0.3s ease" },
-  timelineTitle: { fontSize: "1.05rem", fontWeight: 700, marginBottom: 4 },
-  timelineDesc: { color: "#6B6B88", fontSize: "0.88rem", lineHeight: 1.4 },
-  // Dot States
-  pendingDot: { background: "#161622", borderColor: "#2A2A3E" },
-  activeDot: { background: "#FF3D00", borderColor: "rgba(255, 61, 0, 0.3)", boxShadow: "0 0 0 4px rgba(255, 61, 0, 0.1)" },
-  pastDot: { background: "#00E676", borderColor: "rgba(0, 230, 118, 0.2)" },
-  // Mechanic info
-  mechanicCard: { display: "flex", alignItems: "center", gap: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "14px 16px", borderRadius: 12, marginTop: 14, maxWidth: 360 },
-  mechanicAvatar: { width: 40, height: 40, borderRadius: "50%", background: "#FF3D00", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" },
-  mechanicName: { fontWeight: 700, fontSize: "0.92rem", color: "#F0F0F8" },
-  mechanicLabel: { fontSize: "0.75rem", color: "#6B6B88", marginTop: 2 },
-  // Footer
-  footer: { background: "#070710", borderTop: "1px solid #1E1E2E", padding: "40px 0", marginTop: "auto", width: "100%" },
-  footerInner: { maxWidth: 1200, margin: "0 auto", padding: "0 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 },
-  footerCopy: { color: "#3A3A52", fontSize: "0.8rem" },
+  page: { background: "#0E0E18", minHeight: "100vh", color: "#F0F0F8" },
+  nav: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 32px", borderBottom: "1px solid #1E1E2E", background: "#0A0A14" },
+  logo: { fontSize: "1.2rem", fontWeight: 800, textDecoration: "none", color: "#F0F0F8" },
+  navLink: { color: "#9E9EB5", fontSize: "0.9rem", textDecoration: "none", border: "1px solid #2A2A3E", padding: "8px 14px", borderRadius: 8 },
+  container: { maxWidth: 680, margin: "40px auto", padding: "0 24px 80px" },
+  trackBox: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 20, padding: 36, textAlign: "center" as const, marginBottom: 28 },
+  title: { fontSize: "1.8rem", fontWeight: 800, marginBottom: 12 },
+  subtitle: { color: "#6B6B88", fontSize: "0.95rem", marginBottom: 28, lineHeight: 1.6 },
+  form: { display: "flex", gap: 12 },
+  input: { flex: 1, background: "#0E0E18", border: "1px solid #2A2A3E", borderRadius: 10, padding: "14px 18px", color: "#F0F0F8", fontSize: "1rem", outline: "none" },
+  button: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", borderRadius: 10, padding: "0 24px", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", boxShadow: "0 4px 16px rgba(255,61,0,0.25)" },
+  error: { background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#EF4444", borderRadius: 10, padding: "12px 16px", marginTop: 16, fontSize: "0.9rem", textAlign: "left" as const },
+  loadingBox: { display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 16, padding: "40px 0" },
+  spinner: { width: 32, height: 32, border: "3px solid rgba(255,61,0,0.1)", borderTopColor: "#FF3D00", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
+  resultCard: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 20, overflow: "hidden", boxShadow: "0 10px 40px rgba(0,0,0,0.4)" },
+  cardHeader: { padding: 24, background: "#1A1A2A", borderBottom: "1px solid #222235", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  bookingBadge: { background: "rgba(0,230,118,0.1)", color: "#00E676", border: "1px solid rgba(0,230,118,0.2)", borderRadius: 6, padding: "4px 8px", fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em", width: "fit-content", marginBottom: 6 },
+  bikeName: { fontSize: "1.3rem", fontWeight: 800 },
+  bookingId: { fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 700, color: "#6366F1" },
+  infoGrid: { padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, borderBottom: "1px solid #222235" },
+  infoCol: { display: "flex", flexDirection: "column" as const, gap: 4 },
+  infoLabel: { fontSize: "0.75rem", color: "#6B6B88", textTransform: "uppercase" as const, letterSpacing: "0.05em", fontWeight: 700 },
+  infoText: { fontSize: "0.95rem", fontWeight: 600 },
+  timelineBox: { padding: 24 },
+  timelineTitle: { fontSize: "1.1rem", fontWeight: 800, marginBottom: 24 },
+  timeline: { position: "relative" as const, paddingLeft: 32 },
+  timelineLine: { position: "absolute" as const, left: 9, top: 8, bottom: 8, width: 2, background: "#222235" },
+  timelineLineFill: { position: "absolute" as const, left: 0, top: 0, width: 2, background: "#FF3D00", transition: "height 0.4s ease" },
+  stepRow: { display: "flex", gap: 20, marginBottom: 32, position: "relative" as const },
+  stepDot: { position: "absolute" as const, left: -32, width: 20, height: 20, borderRadius: "50%", background: "#161622", border: "3px solid #222235", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", fontWeight: 800, color: "#fff", transition: "all 0.3s" },
+  dotActive: { borderColor: "#FF3D00", background: "rgba(255,61,0,0.15)", boxShadow: "0 0 12px rgba(255,61,0,0.4)" },
+  dotPast: { borderColor: "#00E676", background: "#00E676" },
+  stepContent: { display: "flex", flexDirection: "column" as const, gap: 4, marginTop: -2 },
+  stepTitleText: { fontSize: "0.95rem", fontWeight: 700 },
+  stepDesc: { color: "#6B6B88", fontSize: "0.85rem", lineHeight: 1.5 },
+  updateTime: { fontSize: "0.75rem", color: "#F59E0B", fontWeight: 600 },
+  empty: { padding: 40, textAlign: "center" as const },
 };

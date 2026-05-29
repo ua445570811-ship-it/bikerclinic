@@ -2,6 +2,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { db, IS_MOCK_MODE } from "@/lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+
 
 type Booking = {
   id: string;
@@ -46,9 +49,39 @@ export default function UserDashboard() {
     const phone = localStorage.getItem("bc_user_phone");
     if (!phone) { router.push("/user/login"); return; }
     setUserPhone(phone);
-    loadBookings(phone);
-    const interval = setInterval(() => loadBookings(phone), 2000);
-    return () => clearInterval(interval);
+
+    if (IS_MOCK_MODE) {
+      loadBookings(phone);
+      const interval = setInterval(() => loadBookings(phone), 2000);
+      return () => clearInterval(interval);
+    } else {
+      const q = query(
+        collection(db, "bookings"),
+        where("phone", "==", phone)
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const mine: Booking[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          // Avoid duplicate push if both doc.id is same, and merge firestore metadata
+          mine.push({ ...data, id: data.id || doc.id } as Booking);
+        });
+
+        // Sort by createdAt descending
+        mine.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+        setBookings(mine);
+        if (mine.length > 0 && mine[0].name) {
+          setUserName(mine[0].name.split(" ")[0]);
+        }
+      }, (error) => {
+        console.error("Firestore onSnapshot error:", error);
+        loadBookings(phone);
+      });
+
+      return () => unsubscribe();
+    }
   }, [router, loadBookings]);
 
   const activeBookings = bookings.filter(b => b.status !== "Completed");

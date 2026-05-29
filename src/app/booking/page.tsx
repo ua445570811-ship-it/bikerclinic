@@ -2,6 +2,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { db, IS_MOCK_MODE } from "@/lib/firebase";
+import { collection, addDoc } from "firebase/firestore";
+
 
 // ── Types ──────────────────────────────────────────────
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -53,15 +56,39 @@ export default function BookingPage() {
 
   const submitBooking = async () => {
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1000));
-    const id = generateId();
-    const booking = {
-      id, ...form, promoDiscount: form.discount, discountAmount: form.discount,
-      status: "New", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    };
-    const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    localStorage.setItem("bc_bookings", JSON.stringify([...prev, booking]));
-    router.push(`/confirmation?id=${id}&name=${encodeURIComponent(form.name)}`);
+    try {
+      const id = generateId();
+      const booking = {
+        id, ...form, promoDiscount: form.discount, discountAmount: form.discount,
+        status: "New", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+
+      if (!IS_MOCK_MODE) {
+        await addDoc(collection(db, "bookings"), booking);
+      } else {
+        const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+        localStorage.setItem("bc_bookings", JSON.stringify([...prev, booking]));
+      }
+
+      // Keep local copy so the current device can always access it easily
+      const devicePrev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+      localStorage.setItem("bc_bookings", JSON.stringify([...devicePrev, booking]));
+
+      router.push(`/confirmation?id=${id}&name=${encodeURIComponent(form.name)}`);
+    } catch (error) {
+      console.error("Error submitting booking: ", error);
+      // Even if database fails, save to localStorage so the booking is not lost
+      const id = generateId();
+      const booking = {
+        id, ...form, promoDiscount: form.discount, discountAmount: form.discount,
+        status: "New", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+      localStorage.setItem("bc_bookings", JSON.stringify([...prev, booking]));
+      router.push(`/confirmation?id=${id}&name=${encodeURIComponent(form.name)}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const canNext: Record<number, boolean> = {

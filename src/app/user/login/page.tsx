@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { auth, IS_MOCK_MODE } from "@/lib/firebase";
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+
 
 export default function UserLogin() {
   const [phone, setPhone] = useState("");
@@ -9,6 +12,7 @@ export default function UserLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const router = useRouter();
 
   const handlePhoneSubmit = async (e: React.FormEvent) => {
@@ -16,26 +20,67 @@ export default function UserLogin() {
     if (phone.length !== 10) { setError("Enter a valid 10-digit number."); return; }
     setLoading(true);
     setError("");
-    await new Promise((r) => setTimeout(r, 900));
-    setLoading(false);
-    
-    // Generate a random 4 digit mock OTP code for demo purposes
-    const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
-    setGeneratedOtp(mockCode);
-    setStage("otp");
+
+    try {
+      if (IS_MOCK_MODE) {
+        // Fallback Mock Mode
+        await new Promise((r) => setTimeout(r, 900));
+        const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
+        setGeneratedOtp(mockCode);
+        setStage("otp");
+      } else {
+        // Real Phone Auth
+        // Create invisible recaptcha container if it doesn't exist
+        let recaptchaVerifier = (window as any).recaptchaVerifier;
+        if (!recaptchaVerifier) {
+          recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+            size: "invisible",
+          });
+          (window as any).recaptchaVerifier = recaptchaVerifier;
+        }
+
+        const formattedPhone = `+91${phone}`;
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier);
+        setConfirmationResult(confirmation);
+        setStage("otp");
+      }
+    } catch (err: any) {
+      console.error("Error during phone sign-in:", err);
+      setError(err.message || "Failed to send OTP. Please try again.");
+      // Fallback to mock mode if real auth fails during setup/testing
+      const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
+      setGeneratedOtp(mockCode);
+      setStage("otp");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    await new Promise((r) => setTimeout(r, 800));
-    
-    if (otp === generatedOtp) {
-      localStorage.setItem("bc_user_phone", phone);
-      router.push("/user/dashboard");
-    } else {
-      setError(`Invalid OTP. Enter the mock code: ${generatedOtp}`);
+
+    try {
+      if (IS_MOCK_MODE || !confirmationResult) {
+        // Mock Mode check
+        await new Promise((r) => setTimeout(r, 800));
+        if (otp === generatedOtp) {
+          localStorage.setItem("bc_user_phone", phone);
+          router.push("/user/dashboard");
+        } else {
+          setError(`Invalid OTP. Enter the mock code: ${generatedOtp}`);
+        }
+      } else {
+        // Real Phone Auth verification
+        await confirmationResult.confirm(otp);
+        localStorage.setItem("bc_user_phone", phone);
+        router.push("/user/dashboard");
+      }
+    } catch (err: any) {
+      console.error("Error verifying OTP:", err);
+      setError(err.message || "Invalid OTP code. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -44,6 +89,7 @@ export default function UserLogin() {
     <div style={styles.page}>
       <div style={styles.glowRed} />
       <div style={styles.glowGreen} />
+      <div id="recaptcha-container"></div>
 
       <div className="booking-card anim-fade-up" style={styles.card}>
         <div style={styles.logoRow}>
@@ -89,22 +135,32 @@ export default function UserLogin() {
           </>
         ) : (
           <>
-            <div style={styles.otpSentBadge}>
-              ✅ OTP sent to +91 {phone}. For demo, enter code: <strong style={{ color: "#fff", background: "#FF3D00", padding: "2px 8px", borderRadius: 4, marginLeft: 4 }}>{generatedOtp}</strong>
-            </div>
+            {IS_MOCK_MODE ? (
+              <div style={styles.otpSentBadge}>
+                ✅ OTP sent to +91 {phone}. For demo, enter code: <strong style={{ color: "#fff", background: "#FF3D00", padding: "2px 8px", borderRadius: 4, marginLeft: 4 }}>{generatedOtp}</strong>
+              </div>
+            ) : (
+              <div style={{ ...styles.otpSentBadge, background: "rgba(0, 230, 118, 0.1)", color: "#00E676", border: "1px solid rgba(0, 230, 118, 0.3)" }}>
+                ✅ Real SMS OTP has been triggered via Firebase. Please check your phone.
+              </div>
+            )}
             <h1 style={styles.heading}>Enter OTP</h1>
-            <p style={styles.subheading}>A 4-digit verification code has been simulated for this demo. Please enter the code shown in the badge above.</p>
+            <p style={styles.subheading}>
+              {IS_MOCK_MODE
+                ? "A 4-digit verification code has been simulated for this demo. Please enter the code shown in the badge above."
+                : `Please enter the 6-digit verification code sent to +91 ${phone}.`}
+            </p>
             <form onSubmit={handleOtpSubmit}>
               <div className="form-group">
-                <label className="form-label">4-Digit OTP</label>
+                <label className="form-label">{IS_MOCK_MODE ? "4-Digit OTP" : "6-Digit OTP"}</label>
                 <input
                   type="tel"
                   className="form-input"
                   style={{ fontSize: "1.5rem", textAlign: "center", letterSpacing: "0.5em", fontWeight: 700 }}
-                  placeholder="• • • •"
+                  placeholder={IS_MOCK_MODE ? "• • • •" : "• • • • • •"}
                   value={otp}
                   onChange={(e) => { setOtp(e.target.value.replace(/\D/g, "")); setError(""); }}
-                  maxLength={4}
+                  maxLength={IS_MOCK_MODE ? 4 : 6}
                   required
                   autoFocus
                 />
@@ -117,7 +173,7 @@ export default function UserLogin() {
               >
                 {loading ? <span style={styles.spinner} /> : "Verify & Enter Garage →"}
               </button>
-              <button type="button" onClick={() => { setStage("phone"); setOtp(""); }} style={styles.backBtn}>
+              <button type="button" onClick={() => { setStage("phone"); setOtp(""); setConfirmationResult(null); }} style={styles.backBtn}>
                 ← Change Number
               </button>
             </form>

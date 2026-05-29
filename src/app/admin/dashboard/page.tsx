@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { db, IS_MOCK_MODE } from "@/lib/firebase";
+import { collection, onSnapshot, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
 
 type Booking = {
   id: string;
@@ -21,6 +23,7 @@ type Booking = {
   createdAt?: string;
   updatedAt?: string;
   notes?: string;
+  _firestoreDocId?: string;
 };
 
 type Coupon = {
@@ -133,21 +136,7 @@ export default function AdminDashboard() {
   const [couponMsg, setCouponMsg] = useState("");
   const [mechanics, setMechanics] = useState<RegisteredMechanic[]>([]);
 
-  useEffect(() => {
-    if (!sessionStorage.getItem("bc_admin_auth")) {
-      router.push("/admin/login");
-      return;
-    }
-    loadData();
-    const interval = setInterval(loadData, 2000);
-    return () => clearInterval(interval);
-  }, [router]);
-
-  const loadData = () => {
-    const raw = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    raw.sort((a: Booking, b: Booking) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-    setBookings(raw);
-    
+  const loadLocalData = () => {
     const rawC = JSON.parse(localStorage.getItem("bc_coupons") || "[]");
     rawC.sort((a: Coupon, b: Coupon) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     setCoupons(rawC);
@@ -160,37 +149,141 @@ export default function AdminDashboard() {
     setMechanics(JSON.parse(mechs));
   };
 
-  const updateStatus = (id: string, newStatus: string) => {
-    const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    const idx = prev.findIndex((b: Booking) => b.id === id);
-    if (idx > -1) {
-      prev[idx].status = newStatus;
-      prev[idx].updatedAt = new Date().toISOString();
-      
-      if (newStatus === "New") {
-        prev[idx].assignedMechanic = "";
-      }
-      
-      localStorage.setItem("bc_bookings", JSON.stringify(prev));
+  const loadData = () => {
+    const raw = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+    raw.sort((a: Booking, b: Booking) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    setBookings(raw);
+    loadLocalData();
+  };
+
+  useEffect(() => {
+    if (!sessionStorage.getItem("bc_admin_auth")) {
+      router.push("/admin/login");
+      return;
+    }
+    
+    loadLocalData();
+
+    if (IS_MOCK_MODE) {
       loadData();
+      const interval = setInterval(loadData, 2000);
+      return () => clearInterval(interval);
+    } else {
+      const q = collection(db, "bookings");
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const list: Booking[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          list.push({ ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id } as Booking);
+        });
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setBookings(list);
+      }, (err) => {
+        console.error("Firestore onSnapshot error, falling back to local storage polling:", err);
+        loadData();
+      });
+      return () => unsubscribe();
+    }
+  }, [router]);
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    if (IS_MOCK_MODE) {
+      const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+      const idx = prev.findIndex((b: Booking) => b.id === id);
+      if (idx > -1) {
+        prev[idx].status = newStatus;
+        prev[idx].updatedAt = new Date().toISOString();
+        
+        if (newStatus === "New") {
+          prev[idx].assignedMechanic = "";
+        }
+        
+        localStorage.setItem("bc_bookings", JSON.stringify(prev));
+        loadData();
+      }
+    } else {
+      try {
+        const booking = bookings.find(b => b.id === id);
+        let docId = booking?._firestoreDocId;
+        
+        if (!docId) {
+          const q = query(collection(db, "bookings"), where("id", "==", id));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            docId = snap.docs[0].id;
+          }
+        }
+
+        if (docId) {
+          const docRef = doc(db, "bookings", docId);
+          const updates: any = {
+            status: newStatus,
+            updatedAt: new Date().toISOString()
+          };
+          if (newStatus === "New") {
+            updates.assignedMechanic = "";
+          }
+          await updateDoc(docRef, updates);
+        } else {
+          console.error("Booking document ID not found for status update");
+        }
+      } catch (err) {
+        console.error("Error updating status in Firestore:", err);
+      }
     }
   };
 
-  const assignMechanic = (id: string, mechanicName: string) => {
-    const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    const idx = prev.findIndex((b: Booking) => b.id === id);
-    if (idx > -1) {
-      prev[idx].assignedMechanic = mechanicName;
-      prev[idx].updatedAt = new Date().toISOString();
-      
-      if (prev[idx].status === "New" && mechanicName) {
-        prev[idx].status = "Assigned";
-      } else if (!mechanicName && prev[idx].status === "Assigned") {
-        prev[idx].status = "New";
+  const assignMechanic = async (id: string, mechanicName: string) => {
+    if (IS_MOCK_MODE) {
+      const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+      const idx = prev.findIndex((b: Booking) => b.id === id);
+      if (idx > -1) {
+        prev[idx].assignedMechanic = mechanicName;
+        prev[idx].updatedAt = new Date().toISOString();
+        
+        if (prev[idx].status === "New" && mechanicName) {
+          prev[idx].status = "Assigned";
+        } else if (!mechanicName && prev[idx].status === "Assigned") {
+          prev[idx].status = "New";
+        }
+        
+        localStorage.setItem("bc_bookings", JSON.stringify(prev));
+        loadData();
       }
-      
-      localStorage.setItem("bc_bookings", JSON.stringify(prev));
-      loadData();
+    } else {
+      try {
+        const booking = bookings.find(b => b.id === id);
+        let docId = booking?._firestoreDocId;
+
+        if (!docId) {
+          const q = query(collection(db, "bookings"), where("id", "==", id));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            docId = snap.docs[0].id;
+          }
+        }
+
+        if (docId) {
+          const docRef = doc(db, "bookings", docId);
+          const currentStatus = booking?.status || "New";
+          let newStatus = currentStatus;
+          if (currentStatus === "New" && mechanicName) {
+            newStatus = "Assigned";
+          } else if (!mechanicName && currentStatus === "Assigned") {
+            newStatus = "New";
+          }
+
+          await updateDoc(docRef, {
+            assignedMechanic: mechanicName,
+            status: newStatus,
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          console.error("Booking document ID not found for assigning mechanic");
+        }
+      } catch (err) {
+        console.error("Error assigning mechanic in Firestore:", err);
+      }
     }
   };
 
@@ -219,216 +312,194 @@ export default function AdminDashboard() {
     if (idx > -1) { prev[idx].active = !current; localStorage.setItem("bc_coupons", JSON.stringify(prev)); loadData(); }
   };
 
-  const filtered = bookings.filter(b =>
-    b.id?.toLowerCase().includes(search.toLowerCase()) ||
-    b.name?.toLowerCase().includes(search.toLowerCase()) ||
-    b.phone?.includes(search)
-  );
-
-  const metrics = {
-    newCount: bookings.filter(b => b.status === "New").length,
-    inProgress: bookings.filter(b => b.status === "In Progress" || b.status === "Assigned").length,
-    completed: bookings.filter(b => b.status === "Completed").length,
-    total: bookings.length,
-  };
-
-  const statusColors: Record<string, string> = {
-    New: "#6366F1", Assigned: "#F59E0B", "In Progress": "#FF3D00", Completed: "#00E676",
-  };
+  const filtered = bookings.filter(b => {
+    const s = search.toLowerCase();
+    return b.id.toLowerCase().includes(s) || b.name.toLowerCase().includes(s) || b.phone.includes(s) || (b.assignedMechanic || "").toLowerCase().includes(s);
+  });
 
   return (
-    <div className="admin-shell">
-      {/* Sidebar Backdrop on Mobile */}
-      {mobileSidebarOpen && (
-        <div className="admin-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
-      )}
+    <div style={styles.container}>
       {/* Sidebar */}
-      <aside className={`admin-sidebar ${mobileSidebarOpen ? "active" : ""}`} style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <span style={{ fontSize: "1.4rem" }}>🏍️</span>
-          <span>Biker<span style={{ color: "#FF3D00" }}>Clinic</span></span>
+      <aside className={`admin-sidebar ${mobileSidebarOpen ? "open" : ""}`} style={styles.sidebar}>
+        <div style={styles.sidebarBrand}>🏍️ BikerClinic</div>
+        <div style={styles.sidebarMenu}>
+          <button onClick={() => { setTab("bookings"); setMobileSidebarOpen(false); }} style={{ ...styles.menuItem, ...(tab === "bookings" ? styles.menuItemActive : {}) }}>
+            📅 Bookings
+          </button>
+          <button onClick={() => { setTab("coupons"); setMobileSidebarOpen(false); }} style={{ ...styles.menuItem, ...(tab === "coupons" ? styles.menuItemActive : {}) }}>
+            🎫 Promo Coupons
+          </button>
         </div>
-        <div style={s.sidebarBadge}>ADMIN PANEL</div>
-        <nav style={s.nav}>
-          <button onClick={() => { setTab("bookings"); setMobileSidebarOpen(false); }} style={{ ...s.navItem, ...(tab === "bookings" ? s.navActive : {}) }}>📊 CRM Dashboard</button>
-          <button onClick={() => { setTab("coupons"); setMobileSidebarOpen(false); }} style={{ ...s.navItem, ...(tab === "coupons" ? s.navActive : {}) }}>🎫 Coupons</button>
-          <a href="/mechanic/login" style={{ ...s.navItem, textDecoration: "none", display: "block" }}>👨‍🔧 Mechanic App ↗</a>
-        </nav>
-        <button onClick={() => { sessionStorage.removeItem("bc_admin_auth"); router.push("/admin/login"); }} style={s.logoutBtn}>🚪 Sign Out</button>
+        <button onClick={() => { sessionStorage.removeItem("bc_admin_auth"); router.push("/admin/login"); }} style={styles.logoutBtn}>
+          Sign Out
+        </button>
       </aside>
 
-      {/* Main */}
-      <main className="admin-main" style={s.main}>
-        <header style={s.topbar}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              className="mobile-nav-toggle"
-              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-              style={{ display: "none", fontSize: "1.5rem", background: "transparent", color: "#F0F0F8", border: "none", cursor: "pointer", marginRight: 8 }}
-              aria-label="Toggle menu"
-            >
-              ☰
-            </button>
+      {/* Main Content Area */}
+      <main style={styles.mainContent}>
+        {/* Top Navbar */}
+        <nav style={styles.topbar}>
+          <button className="menu-toggle" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)} style={styles.toggleBtn}>
+            ☰
+          </button>
+          <div style={styles.topbarTitle}>Admin Dashboard</div>
+          <div style={styles.profileBadge}>Administrator</div>
+        </nav>
+
+        {/* Dynamic Panel */}
+        <div style={{ padding: "32px 24px" }}>
+          {tab === "bookings" ? (
             <div>
-              <h1 style={{ fontSize: "1.2rem", fontWeight: 700 }}>{tab === "bookings" ? "Live Bookings CRM" : "Coupons & Offers"}</h1>
-              <p style={{ color: "#6B6B88", fontSize: "0.8rem", marginTop: 2 }}>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</p>
-            </div>
-          </div>
-          <div style={s.avatar}>A</div>
-        </header>
-
-        <div style={s.content}>
-          {tab === "bookings" && (
-            <>
-              {/* Metrics */}
-              <div className="responsive-grid-4" style={{ marginBottom: 24 }}>
-                {[
-                  { label: "New Bookings", value: metrics.newCount, color: "#6366F1" },
-                  { label: "In Progress", value: metrics.inProgress, color: "#F59E0B" },
-                  { label: "Completed", value: metrics.completed, color: "#00E676" },
-                  { label: "Total Customers", value: metrics.total, color: "#FF3D00" },
-                ].map(m => (
-                  <div key={m.label} style={{ ...s.metricCard, borderTop: `3px solid ${m.color}` }}>
-                    <div style={{ fontSize: "0.8rem", color: "#6B6B88", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>{m.label}</div>
-                    <div style={{ fontSize: "2rem", fontWeight: 800, color: m.color }}>{m.value}</div>
-                  </div>
-                ))}
+              {/* Header */}
+              <div style={styles.panelHeader}>
+                <div>
+                  <h2 style={styles.panelTitle}>Appointment Bookings</h2>
+                  <p style={styles.panelSub}>Manage service requests, assign mechanics, and update statuses.</p>
+                </div>
+                <input
+                  style={styles.searchInput}
+                  placeholder="🔍 Search ID, customer, mechanic..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
               </div>
 
-              {/* Table */}
-              <div style={s.tableCard}>
-                <div className="admin-table-header">
-                  <h2 style={{ fontSize: "1rem", fontWeight: 700 }}>All Bookings</h2>
-                  <input
-                    style={s.searchInput}
-                    placeholder="Search by ID, name, phone..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                  />
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={s.table}>
-                    <thead>
-                      <tr style={s.thead}>
-                        {["Booking ID", "Customer", "Bike & Service", "Schedule", "Status", "Action"].map(h => (
-                          <th key={h} style={s.th}>{h}</th>
-                        ))}
+              {/* Grid / Table */}
+              <div className="table-wrapper" style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.thRow}>
+                      <th style={styles.th}>Booking ID</th>
+                      <th style={styles.th}>Customer</th>
+                      <th style={styles.th}>Vehicle</th>
+                      <th style={styles.th}>Schedule</th>
+                      <th style={styles.th}>Service Type</th>
+                      <th style={styles.th}>Assign Mechanic</th>
+                      <th style={styles.th}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={styles.tdEmpty}>No bookings found.</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.length === 0 ? (
-                        <tr><td colSpan={6} style={{ textAlign: "center", padding: 40, color: "#6B6B88" }}>No bookings found.</td></tr>
-                      ) : filtered.map(b => (
-                        <tr key={b.id} style={s.tr}>
-                          <td style={{ ...s.td, fontWeight: 700, color: "#6366F1", fontFamily: "monospace" }}>{b.id}</td>
-                          <td style={s.td}>
-                            <div style={{ fontWeight: 600 }}>{b.name}</div>
-                            <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.phone}</div>
-                          </td>
-                          <td style={s.td}>
-                            <div style={{ fontWeight: 600 }}>{b.brand} {b.model}</div>
-                            <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.service}{b.package ? ` (${b.package})` : ""} · {b.serviceType}</div>
-                            {b.assignedMechanic && <div style={{ fontSize: "0.75rem", color: "#F59E0B", marginTop: 2 }}>👨‍🔧 {b.assignedMechanic}</div>}
-                            {b.notes && (
-                              <div style={{ fontSize: "0.78rem", color: "#FF3D00", marginTop: 6, background: "rgba(255, 61, 0, 0.05)", padding: "4px 8px", borderRadius: 6, border: "1px solid rgba(255, 61, 0, 0.15)", display: "inline-block", maxWidth: 220, wordBreak: "break-word" }}>
-                                📋 Issue: {b.notes}
-                              </div>
-                            )}
-                          </td>
-                          <td style={s.td}>
-                            <div>{b.date}</div>
-                            <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.time}</div>
-                          </td>
-                          <td style={s.td}>
-                            <span style={{ ...s.badge, background: `${statusColors[b.status] || "#6B6B88"}18`, color: statusColors[b.status] || "#6B6B88", border: `1px solid ${statusColors[b.status] || "#6B6B88"}40` }}>
-                              {b.status}
-                            </span>
-                          </td>
-                           <td style={s.td}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <select
-                                style={s.select}
-                                value={b.status}
-                                onChange={e => updateStatus(b.id, e.target.value)}
-                              >
-                                {["New", "Assigned", "In Progress", "Completed"].map(st => (
-                                  <option key={st} value={st}>{st}</option>
-                                ))}
-                              </select>
-                              
-                              {b.status !== "Completed" && (
-                                <select
-                                  style={{ ...s.select, fontSize: "0.8rem", padding: "4px 8px", borderColor: "#F59E0B" }}
-                                  value={b.assignedMechanic || ""}
-                                  onChange={e => {
-                                    if (e.target.value === "__custom__") {
-                                      const customName = prompt("Enter Custom Mechanic Name:");
-                                      if (customName) assignMechanic(b.id, customName);
-                                    } else {
-                                      assignMechanic(b.id, e.target.value);
-                                    }
-                                  }}
-                                >
-                                  <option value="">-- Assign Mechanic --</option>
-                                  {getQualifiedMechanics(b).map(m => (
-                                    <option key={m.name} value={m.name}>{m.name}</option>
-                                  ))}
-                                  <option value="__custom__">✍️ Custom Name...</option>
-                                </select>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    ) : filtered.map(b => (
+                      <tr key={b.id} style={styles.tr}>
+                        <td style={{ ...styles.td, fontWeight: 700, color: "#6366F1" }}>
+                          <Link href={`/track?id=${b.id}`} style={{ color: "#6366F1", textDecoration: "none" }}>{b.id}</Link>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={{ fontWeight: 600 }}>{b.name}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.phone}</div>
+                        </td>
+                        <td style={styles.td}>{b.brand} {b.model}</td>
+                        <td style={styles.td}>
+                          <div>{b.date}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.time}</div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={{ textTransform: "capitalize" }}>{b.serviceType}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.service}{b.package ? ` (${b.package})` : ""}</div>
+                        </td>
+                        <td style={styles.td}>
+                          <select
+                            style={styles.select}
+                            value={b.assignedMechanic || ""}
+                            onChange={e => assignMechanic(b.id, e.target.value)}
+                          >
+                            <option value="">Choose Mechanic</option>
+                            {getQualifiedMechanics(b).map(m => (
+                              <option key={m.name} value={m.name}>{m.name.split("@")[0]}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={styles.td}>
+                          <select
+                            style={{
+                              ...styles.select,
+                              color: b.status === "Completed" ? "#00E676" : b.status === "In Progress" ? "#FF3D00" : b.status === "Assigned" ? "#F59E0B" : "#F0F0F8",
+                              fontWeight: 700
+                            }}
+                            value={b.status}
+                            onChange={e => updateStatus(b.id, e.target.value)}
+                          >
+                            <option value="New">New Request</option>
+                            <option value="Assigned">Assigned</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {/* Coupons Panel */}
+              <div style={styles.panelHeader}>
+                <div>
+                  <h2 style={styles.panelTitle}>Promo Coupons</h2>
+                  <p style={styles.panelSub}>Create, toggle, and manage discount promo codes.</p>
                 </div>
               </div>
-            </>
-          )}
 
-          {tab === "coupons" && (
-            <div className="coupons-layout-grid">
-              {/* Create form */}
-              <div style={s.tableCard}>
-                <h2 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 20 }}>Create Promo Code</h2>
-                <form onSubmit={addCoupon}>
-                  <div className="form-group">
-                    <label className="form-label">Code Name</label>
-                    <input className="form-input" placeholder="e.g. BIKER100" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} required />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div className="form-group">
-                      <label className="form-label">Type</label>
-                      <select className="form-input" value={couponType} onChange={e => setCouponType(e.target.value as "flat" | "percent")}>
-                        <option value="flat">Flat (₹)</option>
-                        <option value="percent">Percent (%)</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Value</label>
-                      <input className="form-input" type="number" placeholder="e.g. 150" value={couponValue} onChange={e => setCouponValue(e.target.value)} required min={1} />
-                    </div>
-                  </div>
-                  {couponMsg && <div style={{ color: couponMsg.startsWith("✅") ? "#00E676" : "#EF4444", fontSize: "0.85rem", marginBottom: 12 }}>{couponMsg}</div>}
-                  <button type="submit" style={{ ...s.submitBtn, width: "100%" }}>Generate Coupon</button>
+              {/* Add Coupon Form */}
+              <div style={styles.card}>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: 16 }}>Create New Code</h3>
+                <form onSubmit={addCoupon} style={styles.formInline}>
+                  <input style={styles.formInput} placeholder="PROMO100" value={couponCode} onChange={e => setCouponCode(e.target.value)} required />
+                  <select style={styles.formSelect} value={couponType} onChange={e => setCouponType(e.target.value as any)}>
+                    <option value="flat">Flat Discount (₹)</option>
+                    <option value="percent">Percentage (%)</option>
+                  </select>
+                  <input style={styles.formInput} type="number" placeholder="Value" value={couponValue} onChange={e => setCouponValue(e.target.value)} required />
+                  <button type="submit" style={styles.submitBtn}>Add Coupon</button>
                 </form>
+                {couponMsg && <div style={{ marginTop: 12, color: "#00E676", fontSize: "0.9rem", fontWeight: 600 }}>{couponMsg}</div>}
               </div>
 
-              {/* Coupons list */}
-              <div style={s.tableCard}>
-                <h2 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 20 }}>Active Promo Codes</h2>
-                <table style={s.table}>
-                  <thead><tr style={s.thead}>{["Code", "Discount", "Status", "Toggle"].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+              {/* Coupons Table */}
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.thRow}>
+                      <th style={styles.th}>Code</th>
+                      <th style={styles.th}>Type</th>
+                      <th style={styles.th}>Value</th>
+                      <th style={styles.th}>Status</th>
+                      <th style={styles.th}>Action</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {coupons.length === 0 ? (
-                      <tr><td colSpan={4} style={{ textAlign: "center", padding: 40, color: "#6B6B88" }}>No coupons yet.</td></tr>
+                      <tr>
+                        <td colSpan={5} style={styles.tdEmpty}>No promo codes created yet.</td>
+                      </tr>
                     ) : coupons.map(c => (
-                      <tr key={c.code} style={s.tr}>
-                        <td style={{ ...s.td, fontWeight: 700, letterSpacing: "0.05em" }}>{c.code}</td>
-                        <td style={{ ...s.td, color: "#6366F1", fontWeight: 600 }}>{c.type === "percent" ? `${c.value}% OFF` : `₹${c.value} OFF`}</td>
-                        <td style={s.td}><span style={{ ...s.badge, background: c.active ? "rgba(0,230,118,0.1)" : "rgba(239,68,68,0.1)", color: c.active ? "#00E676" : "#EF4444", border: `1px solid ${c.active ? "#00E67640" : "#EF444440"}` }}>{c.active ? "Active" : "Disabled"}</span></td>
-                        <td style={s.td}><button onClick={() => toggleCoupon(c.code, c.active)} style={{ ...s.ghostBtn }}>{c.active ? "Disable" : "Enable"}</button></td>
+                      <tr key={c.code} style={styles.tr}>
+                        <td style={{ ...styles.td, fontWeight: 700, color: "#FF3D00" }}>{c.code}</td>
+                        <td style={styles.td}>{c.type === "flat" ? "Flat Rate" : "Percentage"}</td>
+                        <td style={styles.td}>{c.type === "flat" ? `₹${c.value}` : `${c.value}%`}</td>
+                        <td style={styles.td}>
+                          <span style={{ color: c.active ? "#00E676" : "#EF4444", fontWeight: 700 }}>
+                            {c.active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td style={styles.td}>
+                          <button
+                            onClick={() => toggleCoupon(c.code, c.active)}
+                            style={{
+                              ...styles.actionBtn,
+                              background: c.active ? "rgba(239,68,68,0.1)" : "rgba(0,230,118,0.1)",
+                              color: c.active ? "#EF4444" : "#00E676",
+                              border: `1px solid ${c.active ? "rgba(239,68,68,0.2)" : "rgba(0,230,118,0.2)"}`
+                            }}
+                          >
+                            {c.active ? "Deactivate" : "Activate"}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -442,31 +513,35 @@ export default function AdminDashboard() {
   );
 }
 
-const s: Record<string, React.CSSProperties> = {
-  shell: { display: "flex", minHeight: "100vh" },
-  sidebar: { width: 240, background: "#0A0A14", borderRight: "1px solid #1E1E2E", display: "flex", flexDirection: "column", padding: "24px 16px", flexShrink: 0 },
-  sidebarLogo: { fontSize: "1.2rem", fontWeight: 800, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 },
-  sidebarBadge: { background: "rgba(99,102,241,0.1)", color: "#6366F1", fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.1em", padding: "4px 10px", borderRadius: 99, border: "1px solid rgba(99,102,241,0.2)", marginBottom: 32, display: "inline-block" },
-  nav: { display: "flex", flexDirection: "column", gap: 4, flex: 1 },
-  navItem: { background: "transparent", border: "none", color: "#9E9EB5", padding: "10px 14px", borderRadius: 10, textAlign: "left", fontSize: "0.9rem", fontWeight: 500, cursor: "pointer", transition: "all 0.2s", width: "100%" },
-  navActive: { background: "rgba(99,102,241,0.1)", color: "#6366F1" },
-  logoutBtn: { background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#EF4444", borderRadius: 10, padding: "10px 14px", fontSize: "0.9rem", cursor: "pointer", marginTop: 16 },
-  main: { flex: 1, display: "flex", flexDirection: "column", background: "#0E0E18", overflow: "hidden" },
-  topbar: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 32px", borderBottom: "1px solid #1E1E2E", background: "#0A0A14" },
-  avatar: { width: 40, height: 40, borderRadius: "50%", background: "#6366F1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1.1rem" },
-  content: { padding: "28px 32px", overflowY: "auto", flex: 1 },
-  metricsGrid: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 },
-  metricCard: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 14, padding: "20px 18px" },
-  tableCard: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 14, padding: "24px" },
-  tableHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  searchInput: { background: "#0E0E18", border: "1px solid #2A2A3E", borderRadius: 8, padding: "8px 14px", color: "#F0F0F8", fontSize: "0.9rem", outline: "none", width: 260 },
-  table: { width: "100%", borderCollapse: "collapse" },
-  thead: { borderBottom: "1px solid #1E1E2E" },
-  th: { padding: "12px 16px", textAlign: "left", fontSize: "0.75rem", color: "#6B6B88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" },
-  tr: { borderBottom: "1px solid #1A1A28" },
-  td: { padding: "14px 16px", fontSize: "0.9rem", verticalAlign: "middle" },
-  badge: { padding: "4px 10px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 700 },
-  select: { background: "#0E0E18", border: "1px solid #2A2A3E", borderRadius: 8, padding: "6px 10px", color: "#F0F0F8", fontSize: "0.85rem", cursor: "pointer", outline: "none" },
-  submitBtn: { background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "#fff", border: "none", padding: "14px 24px", borderRadius: 10, fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", boxShadow: "0 4px 16px rgba(99,102,241,0.3)" },
-  ghostBtn: { background: "transparent", border: "1px solid #2A2A3E", color: "#9E9EB5", borderRadius: 8, padding: "6px 12px", fontSize: "0.82rem", cursor: "pointer" },
+const styles: Record<string, React.CSSProperties> = {
+  container: { display: "flex", minHeight: "100vh", background: "#0E0E18" },
+  sidebar: { width: 260, background: "#0A0A14", borderRight: "1px solid #1E1E2E", display: "flex", flexDirection: "column", padding: 24, zIndex: 99 },
+  sidebarBrand: { fontSize: "1.3rem", fontWeight: 800, marginBottom: 40, color: "#F0F0F8" },
+  sidebarMenu: { display: "flex", flexDirection: "column", gap: 8, flex: 1 },
+  menuItem: { background: "transparent", border: "none", color: "#6B6B88", padding: "12px 16px", borderRadius: 10, textAlign: "left", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" },
+  menuItemActive: { background: "rgba(255,61,0,0.1)", color: "#FF3D00" },
+  logoutBtn: { background: "transparent", border: "1px solid #2A2A3E", color: "#6B6B88", padding: "10px", borderRadius: 10, cursor: "pointer" },
+  mainContent: { flex: 1, display: "flex", flexDirection: "column" },
+  topbar: { height: 70, background: "#0A0A14", borderBottom: "1px solid #1E1E2E", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px" },
+  toggleBtn: { display: "none", background: "transparent", border: "none", color: "#F0F0F8", fontSize: "1.5rem", cursor: "pointer" },
+  topbarTitle: { fontSize: "1.1rem", fontWeight: 700 },
+  profileBadge: { background: "rgba(99,102,241,0.1)", color: "#6366F1", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "6px 12px", fontSize: "0.82rem", fontWeight: 700 },
+  panelHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 28 },
+  panelTitle: { fontSize: "1.5rem", fontWeight: 800, marginBottom: 6 },
+  panelSub: { color: "#6B6B88", fontSize: "0.9rem" },
+  searchInput: { background: "#161622", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "10px 16px", borderRadius: 10, outline: "none", fontSize: "0.9rem", width: 260 },
+  tableWrapper: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, overflow: "hidden" },
+  table: { width: "100%", borderCollapse: "collapse", textAlign: "left" },
+  thRow: { background: "#0A0A14", borderBottom: "1px solid #1E1E2E" },
+  th: { padding: "16px 20px", fontSize: "0.8rem", fontWeight: 700, color: "#9E9EB5", textTransform: "uppercase", letterSpacing: "0.05em" },
+  tr: { borderBottom: "1px solid #1E1E2E", transition: "background 0.2s" },
+  td: { padding: "18px 20px", fontSize: "0.9rem", color: "#F0F0F8" },
+  tdEmpty: { padding: "40px", textAlign: "center", color: "#6B6B88" },
+  select: { background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "8px 12px", borderRadius: 8, outline: "none", cursor: "pointer", width: "100%" },
+  card: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, padding: 24, marginBottom: 28 },
+  formInline: { display: "flex", gap: 12, flexWrap: "wrap" },
+  formInput: { flex: 1, minWidth: 150, background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "12px 14px", borderRadius: 10, outline: "none" },
+  formSelect: { background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "12px", borderRadius: 10, outline: "none", cursor: "pointer" },
+  submitBtn: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", padding: "0 24px", borderRadius: 10, fontWeight: 700, cursor: "pointer", height: 48 },
+  actionBtn: { padding: "6px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }
 };

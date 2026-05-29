@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { db, IS_MOCK_MODE } from "@/lib/firebase";
+import { collection, onSnapshot, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
 
 type Booking = {
   id: string;
@@ -18,6 +20,7 @@ type Booking = {
   landmark?: string;
   notes?: string;
   assignedMechanic?: string;
+  _firestoreDocId?: string;
 };
 
 export default function MechanicDashboard() {
@@ -35,19 +38,65 @@ export default function MechanicDashboard() {
     const name = localStorage.getItem("bc_mechanic_name");
     if (!name) { router.push("/mechanic/login"); return; }
     setMechanicName(name);
-    loadJobs(name);
-    const interval = setInterval(() => loadJobs(name), 1500);
-    return () => clearInterval(interval);
+
+    if (IS_MOCK_MODE) {
+      loadJobs(name);
+      const interval = setInterval(() => loadJobs(name), 1500);
+      return () => clearInterval(interval);
+    } else {
+      const q = collection(db, "bookings");
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const list: Booking[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data.assignedMechanic?.toLowerCase() === name.toLowerCase()) {
+            list.push({ ...data, id: data.id || docSnap.id, _firestoreDocId: docSnap.id } as Booking);
+          }
+        });
+        setMyJobs(list);
+      }, (err) => {
+        console.error("Firestore mechanic load error, falling back to local storage:", err);
+        loadJobs(name);
+      });
+      return () => unsubscribe();
+    }
   }, [router, loadJobs]);
 
-  const updateStatus = (id: string, newStatus: string) => {
-    const prev: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    const idx = prev.findIndex(b => b.id === id);
-    if (idx > -1) {
-      prev[idx].status = newStatus;
-      prev[idx] = { ...prev[idx], updatedAt: new Date().toISOString() } as Booking & { updatedAt: string };
-      localStorage.setItem("bc_bookings", JSON.stringify(prev));
-      loadJobs(mechanicName);
+  const updateStatus = async (id: string, newStatus: string) => {
+    if (IS_MOCK_MODE) {
+      const prev: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
+      const idx = prev.findIndex(b => b.id === id);
+      if (idx > -1) {
+        prev[idx].status = newStatus;
+        prev[idx] = { ...prev[idx], updatedAt: new Date().toISOString() } as Booking & { updatedAt: string };
+        localStorage.setItem("bc_bookings", JSON.stringify(prev));
+        loadJobs(mechanicName);
+      }
+    } else {
+      try {
+        const booking = myJobs.find(b => b.id === id);
+        let docId = booking?._firestoreDocId;
+
+        if (!docId) {
+          const q = query(collection(db, "bookings"), where("id", "==", id));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            docId = snap.docs[0].id;
+          }
+        }
+
+        if (docId) {
+          const docRef = doc(db, "bookings", docId);
+          await updateDoc(docRef, {
+            status: newStatus,
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          console.error("Booking document ID not found for updating status");
+        }
+      } catch (err) {
+        console.error("Error updating status in Firestore:", err);
+      }
     }
   };
 
@@ -98,48 +147,45 @@ export default function MechanicDashboard() {
               {b.status === "Completed" && <div style={{ ...s.inProgressBadge, background: "rgba(0,230,118,0.1)", color: "#00E676", borderColor: "rgba(0,230,118,0.3)" }}>DONE ✅</div>}
             </div>
 
-            <div className="responsive-grid-2" style={{ marginBottom: 20 }}>
-              <div style={s.detailItem}>
-                <div style={s.detailIcon}>👤</div>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{b.name}</div>
-                  <a href={`tel:${b.phone}`} style={{ color: "#FF3D00", fontSize: "0.88rem" }}>{b.phone}</a>
+            <div style={s.cardBody}>
+              <div style={s.infoGrid}>
+                <div style={s.infoItem}>
+                  <div style={s.infoLabel}>Customer</div>
+                  <div style={s.infoValue}>{b.name}</div>
+                  <div style={{ ...s.infoValue, fontSize: "0.85rem", color: "#6B6B88" }}>{b.phone}</div>
                 </div>
+                <div style={s.infoItem}>
+                  <div style={s.infoLabel}>Appointment</div>
+                  <div style={s.infoValue}>{b.date}</div>
+                  <div style={{ ...s.infoValue, fontSize: "0.85rem", color: "#6B6B88" }}>{b.time}</div>
+                </div>
+                {b.serviceType === "doorstep" && (
+                  <div style={{ ...s.infoItem, gridColumn: "1/-1" }}>
+                    <div style={s.infoLabel}>Service Address</div>
+                    <div style={s.infoValue}>{b.address}</div>
+                    {b.landmark && <div style={{ ...s.infoValue, fontSize: "0.85rem", color: "#6B6B88" }}>📍 {b.landmark}</div>}
+                  </div>
+                )}
+                {b.notes && (
+                  <div style={{ ...s.infoItem, gridColumn: "1/-1" }}>
+                    <div style={s.infoLabel}>Special Notes</div>
+                    <div style={{ ...s.infoValue, color: "#9E9EB5", fontStyle: "italic" }}>"{b.notes}"</div>
+                  </div>
+                )}
               </div>
-              <div style={s.detailItem}>
-                <div style={s.detailIcon}>📅</div>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{b.date}</div>
-                  <div style={{ color: "#6B6B88", fontSize: "0.85rem" }}>{b.time}</div>
-                </div>
-              </div>
-              <div style={{ ...s.detailItem, gridColumn: "1/-1" }}>
-                <div style={s.detailIcon}>📍</div>
-                <div style={{ color: "#B0B0C8", fontSize: "0.9rem", lineHeight: 1.5 }}>
-                  {b.address}{b.landmark ? ` · ${b.landmark}` : ""}
-                </div>
-              </div>
-              {b.notes && (
-                <div style={{ ...s.detailItem, gridColumn: "1/-1" }}>
-                  <div style={{ ...s.detailIcon, background: "rgba(255,61,0,0.1)" }}>📝</div>
-                  <div style={{ color: "#FF3D00", fontSize: "0.88rem" }}>{b.notes}</div>
-                </div>
+
+              {/* Status Actions */}
+              {b.status === "Assigned" && (
+                <button onClick={() => updateStatus(b.id, "In Progress")} style={s.primaryBtn}>
+                  🏍️ Start Job
+                </button>
+              )}
+              {b.status === "In Progress" && (
+                <button onClick={() => updateStatus(b.id, "Completed")} style={{ ...s.primaryBtn, background: "linear-gradient(135deg, #00E676, #00b05b)", boxShadow: "0 4px 16px rgba(0,230,118,0.25)" }}>
+                  ✅ Mark Completed
+                </button>
               )}
             </div>
-
-            {b.status === "Assigned" && (
-              <button onClick={() => updateStatus(b.id, "In Progress")} style={{ ...s.actionBtn, background: "rgba(255,61,0,0.1)", color: "#FF3D00", border: "1px solid rgba(255,61,0,0.3)" }}>
-                ▶ Start Job
-              </button>
-            )}
-            {b.status === "In Progress" && (
-              <button onClick={() => updateStatus(b.id, "Completed")} style={{ ...s.actionBtn, background: "rgba(0,230,118,0.1)", color: "#00E676", border: "1px solid rgba(0,230,118,0.3)" }}>
-                ✅ Mark Completed
-              </button>
-            )}
-            {b.status === "Completed" && (
-              <div style={{ color: "#00E676", fontWeight: 700, fontSize: "0.9rem", marginTop: 16, textAlign: "center" }}>✅ Job Completed</div>
-            )}
           </div>
         ))}
       </div>
@@ -148,27 +194,29 @@ export default function MechanicDashboard() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  page: { minHeight: "100vh", background: "#0E0E18", paddingBottom: 40 },
-  header: { background: "#161622", borderBottom: "1px solid #1E1E2E", padding: "24px 20px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "sticky", top: 0, zIndex: 10 },
-  headerLeft: {},
-  mechBadge: { display: "inline-block", background: "rgba(245,158,11,0.1)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.2)", padding: "4px 12px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 10 },
-  name: { fontSize: "1.6rem", fontWeight: 800, marginBottom: 4 },
+  page: { minHeight: "100vh", background: "#0E0E18", paddingBottom: 60 },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", background: "#0A0A14", padding: "28px 24px", borderBottom: "1px solid #1E1E2E" },
+  headerLeft: { display: "flex", flexDirection: "column" as const, gap: 6 },
+  mechBadge: { background: "rgba(255,61,0,0.1)", color: "#FF3D00", border: "1px solid rgba(255,61,0,0.2)", borderRadius: 6, padding: "4px 8px", fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.06em", width: "fit-content" },
+  name: { fontSize: "1.6rem", fontWeight: 800 },
   sub: { color: "#6B6B88", fontSize: "0.9rem" },
-  logoutBtn: { background: "transparent", border: "1px solid #2A2A3E", color: "#6B6B88", borderRadius: 8, padding: "8px 14px", fontSize: "0.85rem", cursor: "pointer" },
-  tabBar: { display: "flex", gap: 12, padding: "16px 20px", borderBottom: "1px solid #1E1E2E" },
-  tab: { background: "transparent", border: "1px solid #2A2A3E", color: "#6B6B88", padding: "8px 16px", borderRadius: 99, fontSize: "0.9rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 },
-  tabActive: { background: "rgba(245,158,11,0.1)", color: "#F59E0B", borderColor: "rgba(245,158,11,0.3)" },
-  tabCount: { background: "rgba(245,158,11,0.2)", color: "#F59E0B", padding: "2px 8px", borderRadius: 99, fontSize: "0.75rem", fontWeight: 800 },
-  jobList: { padding: "20px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 680, margin: "0 auto" },
-  empty: { textAlign: "center", padding: "60px 20px", background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, marginTop: 20 },
-  card: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, padding: 24 },
-  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid #1A1A28" },
-  bookingId: { color: "#F59E0B", fontWeight: 700, fontSize: "0.85rem", letterSpacing: "0.05em", marginBottom: 4 },
-  bikeName: { fontSize: "1.25rem", fontWeight: 700, marginBottom: 4 },
-  serviceLabel: { color: "#6B6B88", fontSize: "0.88rem" },
-  inProgressBadge: { background: "rgba(255,61,0,0.1)", color: "#FF3D00", border: "1px solid rgba(255,61,0,0.3)", padding: "5px 10px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.05em" },
-  detailsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 },
-  detailItem: { display: "flex", gap: 12, alignItems: "flex-start" },
-  detailIcon: { width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", flexShrink: 0 },
-  actionBtn: { width: "100%", padding: 16, borderRadius: 12, fontWeight: 700, fontSize: "1rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s" },
+  logoutBtn: { background: "transparent", border: "1px solid #2A2A3E", color: "#6B6B88", padding: "8px 14px", borderRadius: 8, fontSize: "0.85rem", cursor: "pointer", fontWeight: 600 },
+  tabBar: { display: "flex", background: "#0A0A14", borderBottom: "1px solid #1E1E2E" },
+  tab: { flex: 1, padding: "18px", background: "transparent", border: "none", color: "#6B6B88", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", borderBottom: "2px solid transparent", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
+  tabActive: { color: "#FF3D00", borderBottomColor: "#FF3D00" },
+  tabCount: { background: "rgba(255,61,0,0.1)", color: "#FF3D00", fontSize: "0.75rem", padding: "2px 8px", borderRadius: 99 },
+  jobList: { maxWidth: 680, margin: "24px auto", padding: "0 20px", display: "flex", flexDirection: "column" as const, gap: 20 },
+  empty: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, padding: "60px 40px", textAlign: "center" as const },
+  card: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, overflow: "hidden" },
+  cardHeader: { padding: 20, background: "#1A1A2A", borderBottom: "1px solid #222235", display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
+  bookingId: { color: "#6366F1", fontFamily: "monospace", fontSize: "0.82rem", fontWeight: 700, letterSpacing: "0.05em", marginBottom: 4 },
+  bikeName: { fontSize: "1.2rem", fontWeight: 800, marginBottom: 4 },
+  serviceLabel: { color: "#9E9EB5", fontSize: "0.85rem", fontWeight: 500 },
+  inProgressBadge: { background: "rgba(255,61,0,0.1)", color: "#FF3D00", border: "1px solid rgba(255,61,0,0.2)", borderRadius: 6, padding: "4px 8px", fontSize: "0.7rem", fontWeight: 800, letterSpacing: "0.05em" },
+  cardBody: { padding: 20 },
+  infoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 },
+  infoItem: { display: "flex", flexDirection: "column" as const, gap: 4 },
+  infoLabel: { fontSize: "0.72rem", color: "#6B6B88", textTransform: "uppercase" as const, letterSpacing: "0.05em", fontWeight: 700 },
+  infoValue: { fontSize: "0.92rem", fontWeight: 600 },
+  primaryBtn: { width: "100%", padding: 14, background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", borderRadius: 10, fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", boxShadow: "0 4px 16px rgba(255,61,0,0.25)" },
 };
