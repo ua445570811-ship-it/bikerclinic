@@ -39,6 +39,20 @@ export default function BookingPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    const savedName = localStorage.getItem("bc_user_name") || "";
+    const savedEmail = localStorage.getItem("bc_user_email") || "";
+    const savedPhone = localStorage.getItem("bc_user_phone") || "";
+    if (savedName || savedEmail || savedPhone) {
+      setForm(f => ({
+        ...f,
+        name: f.name || savedName,
+        email: f.email || savedEmail,
+        phone: f.phone || savedPhone,
+      }));
+    }
+  }, []);
+
   const selectedPkg = PACKAGES.find(p => p.name === form.package);
   const basePrice = selectedPkg?.price || 0;
   const finalPrice = Math.max(0, basePrice - form.discount);
@@ -95,7 +109,7 @@ export default function BookingPage() {
     1: !!form.serviceType,
     2: !!form.service && !!form.package,
     3: !!form.brand && !!form.model,
-    4: !!form.name && !!form.phone && (form.serviceType === "workshop" || !!form.address) && !!form.date && !!form.time,
+    4: !!form.name && !!form.phone && !!form.email && (form.serviceType === "workshop" || !!form.address) && !!form.date && !!form.time,
     5: true,
   };
 
@@ -207,6 +221,9 @@ export default function BookingPage() {
                   <input style={s.input} placeholder="10-digit mobile" value={form.phone} onChange={e => set("phone", e.target.value)} maxLength={10} />
                 </FormGroup>
               </div>
+              <FormGroup label="Email Address">
+                <input style={s.input} placeholder="your.email@example.com" value={form.email} onChange={e => set("email", e.target.value)} type="email" />
+              </FormGroup>
               {form.serviceType === "doorstep" && (
                 <FormGroup label="Service Address">
                   <input style={s.input} placeholder="Full address where mechanic should come" value={form.address} onChange={e => set("address", e.target.value)} />

@@ -3,13 +3,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { db, IS_MOCK_MODE } from "@/lib/firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, or } from "firebase/firestore";
 
 
 type Booking = {
   id: string;
   name: string;
   phone: string;
+  email?: string;
   brand: string;
   model: string;
   service?: string;
@@ -38,27 +39,41 @@ export default function UserDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [tab, setTab] = useState<"active" | "history">("active");
 
-  const loadBookings = useCallback((phone: string) => {
+  const loadBookings = useCallback((phone: string, email: string) => {
     const all: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
-    const mine = all.filter(b => b.phone === phone).reverse();
+    const mine = all.filter(b => (phone && b.phone === phone) || (email && b.email === email)).reverse();
     setBookings(mine);
     if (mine.length > 0 && mine[0].name) setUserName(mine[0].name.split(" ")[0]);
   }, []);
 
   useEffect(() => {
-    const phone = localStorage.getItem("bc_user_phone");
-    if (!phone) { router.push("/user/login"); return; }
+    const email = localStorage.getItem("bc_user_email") || "";
+    const phone = localStorage.getItem("bc_user_phone") || "";
+    if (!email && !phone) { router.push("/user/login"); return; }
     setUserPhone(phone);
 
+    // Get display name from local storage if available
+    const savedName = localStorage.getItem("bc_user_name");
+    if (savedName) setUserName(savedName.split(" ")[0]);
+
     if (IS_MOCK_MODE) {
-      loadBookings(phone);
-      const interval = setInterval(() => loadBookings(phone), 2000);
+      loadBookings(phone, email);
+      const interval = setInterval(() => loadBookings(phone, email), 2000);
       return () => clearInterval(interval);
     } else {
-      const q = query(
-        collection(db, "bookings"),
-        where("phone", "==", phone)
-      );
+      // Build query using or() constraint for phone/email matching
+      const constraints = [];
+      if (email) constraints.push(where("email", "==", email));
+      if (phone) constraints.push(where("phone", "==", phone));
+
+      let q;
+      if (constraints.length > 1) {
+        q = query(collection(db, "bookings"), or(where("email", "==", email), where("phone", "==", phone)));
+      } else if (constraints.length === 1) {
+        q = query(collection(db, "bookings"), constraints[0]);
+      } else {
+        q = query(collection(db, "bookings"), where("email", "==", "non-existent-placeholder"));
+      }
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const mine: Booking[] = [];
@@ -77,7 +92,7 @@ export default function UserDashboard() {
         }
       }, (error) => {
         console.error("Firestore onSnapshot error:", error);
-        loadBookings(phone);
+        loadBookings(phone, email);
       });
 
       return () => unsubscribe();
@@ -93,7 +108,7 @@ export default function UserDashboard() {
       {/* Navbar */}
       <nav style={s.nav}>
         <div style={s.logo}>🏍️ Biker<span style={{ color: "#FF3D00" }}>Clinic</span></div>
-        <button onClick={() => { localStorage.removeItem("bc_user_phone"); router.push("/user/login"); }} style={s.logoutBtn}>Sign Out</button>
+        <button onClick={() => { localStorage.removeItem("bc_user_phone"); localStorage.removeItem("bc_user_email"); localStorage.removeItem("bc_user_name"); router.push("/user/login"); }} style={s.logoutBtn}>Sign Out</button>
       </nav>
 
       {/* Hero */}
