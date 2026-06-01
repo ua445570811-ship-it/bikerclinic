@@ -135,6 +135,25 @@ export default function UserLogin() {
         localStorage.setItem("bc_user_bike_brand", "");
         localStorage.setItem("bc_user_bike_model", "");
         localStorage.setItem("bc_user_bike_number", "");
+
+        // Add to local mock users list for admin dashboard
+        const mockUsers = JSON.parse(localStorage.getItem("bc_users") || "[]");
+        const exists = mockUsers.some((u: any) => u.email === tempUser.email);
+        if (!exists) {
+          mockUsers.push({
+            uid: "mock-user-123",
+            email: tempUser.email,
+            name: tempUser.name,
+            phone: phone,
+            address: "",
+            bikeBrand: "",
+            bikeModel: "",
+            bikeNumber: "",
+            createdAt: new Date().toISOString()
+          });
+          localStorage.setItem("bc_users", JSON.stringify(mockUsers));
+        }
+
         router.push("/user/dashboard");
       } else {
         // Save user profile to Firestore in background (non-blocking)

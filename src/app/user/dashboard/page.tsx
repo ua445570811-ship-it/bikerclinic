@@ -172,9 +172,30 @@ export default function UserDashboard() {
           bikeModel: profile.bikeModel,
           bikeNumber: profile.bikeNumber,
           updatedAt: new Date().toISOString()
-        }, { merge: merge }).catch((err) => {
+        }, { merge: true }).catch((err) => {
           console.error("Firestore background profile save failed:", err);
         });
+      } else {
+        // Save to local mock users list
+        const mockUsers = JSON.parse(localStorage.getItem("bc_users") || "[]");
+        const idx = mockUsers.findIndex((u: any) => u.uid === uid || u.email === profile.email);
+        const updatedUser = {
+          uid,
+          email: profile.email,
+          name: profile.name,
+          phone: profile.phone,
+          address: profile.address,
+          bikeBrand: profile.bikeBrand,
+          bikeModel: profile.bikeModel,
+          bikeNumber: profile.bikeNumber,
+          updatedAt: new Date().toISOString()
+        };
+        if (idx > -1) {
+          mockUsers[idx] = { ...mockUsers[idx], ...updatedUser };
+        } else {
+          mockUsers.push(updatedUser);
+        }
+        localStorage.setItem("bc_users", JSON.stringify(mockUsers));
       }
 
       // Update local storage values

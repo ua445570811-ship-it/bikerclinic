@@ -121,13 +121,51 @@ const DEFAULT_REGISTERED_MECHANICS: RegisteredMechanic[] = [
   },
 ];
 
-type Tab = "bookings" | "coupons";
+type RegisteredUser = {
+  uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  address?: string;
+  bikeBrand?: string;
+  bikeModel?: string;
+  bikeNumber?: string;
+  createdAt?: string;
+};
+
+const DEFAULT_MOCK_USERS: RegisteredUser[] = [
+  {
+    uid: "mock-user-1",
+    name: "Demo Rider",
+    email: "rider@example.com",
+    phone: "9606538417",
+    address: "123 Rider Street, Bangalore",
+    bikeBrand: "Royal Enfield",
+    bikeModel: "Classic 350",
+    bikeNumber: "KA 03 EX 1234",
+    createdAt: new Date().toISOString()
+  },
+  {
+    uid: "mock-user-2",
+    name: "Jane Smith",
+    email: "jane.smith@example.com",
+    phone: "9876543210",
+    address: "456 Bike Avenue, Mumbai",
+    bikeBrand: "KTM",
+    bikeModel: "Duke 390",
+    bikeNumber: "MH 12 AB 5678",
+    createdAt: new Date().toISOString()
+  }
+];
+
+type Tab = "bookings" | "coupons" | "users";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [users, setUsers] = useState<RegisteredUser[]>([]);
   const [tab, setTab] = useState<Tab>("bookings");
   const [search, setSearch] = useState("");
   const [couponCode, setCouponCode] = useState("");
@@ -147,6 +185,14 @@ export default function AdminDashboard() {
       mechs = JSON.stringify(DEFAULT_REGISTERED_MECHANICS);
     }
     setMechanics(JSON.parse(mechs));
+
+    const rawUsers = JSON.parse(localStorage.getItem("bc_users") || "[]");
+    if (rawUsers.length === 0) {
+      localStorage.setItem("bc_users", JSON.stringify(DEFAULT_MOCK_USERS));
+      setUsers(DEFAULT_MOCK_USERS);
+    } else {
+      setUsers(rawUsers);
+    }
   };
 
   const loadData = () => {
@@ -182,7 +228,24 @@ export default function AdminDashboard() {
         console.error("Firestore onSnapshot error, falling back to local storage polling:", err);
         loadData();
       });
-      return () => unsubscribe();
+
+      const uQ = collection(db, "users");
+      const unsubscribeUsers = onSnapshot(uQ, (snapshot) => {
+        const uList: RegisteredUser[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          uList.push({ ...data, uid: docSnap.id } as RegisteredUser);
+        });
+        uList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setUsers(uList);
+      }, (err) => {
+        console.error("Firestore users onSnapshot error:", err);
+      });
+
+      return () => {
+        unsubscribe();
+        unsubscribeUsers();
+      };
     }
   }, [router]);
 
@@ -317,6 +380,11 @@ export default function AdminDashboard() {
     return b.id.toLowerCase().includes(s) || b.name.toLowerCase().includes(s) || b.phone.includes(s) || (b.assignedMechanic || "").toLowerCase().includes(s);
   });
 
+  const filteredUsers = users.filter(u => {
+    const s = search.toLowerCase();
+    return (u.name || "").toLowerCase().includes(s) || (u.email || "").toLowerCase().includes(s) || (u.phone || "").includes(s);
+  });
+
   return (
     <div style={styles.container}>
       {/* Sidebar */}
@@ -328,6 +396,9 @@ export default function AdminDashboard() {
           </button>
           <button onClick={() => { setTab("coupons"); setMobileSidebarOpen(false); }} style={{ ...styles.menuItem, ...(tab === "coupons" ? styles.menuItemActive : {}) }}>
             🎫 Promo Coupons
+          </button>
+          <button onClick={() => { setTab("users"); setMobileSidebarOpen(false); }} style={{ ...styles.menuItem, ...(tab === "users" ? styles.menuItemActive : {}) }}>
+            👥 Registered Users
           </button>
         </div>
         <button onClick={() => { sessionStorage.removeItem("bc_admin_auth"); router.push("/admin/login"); }} style={styles.logoutBtn}>
@@ -348,7 +419,7 @@ export default function AdminDashboard() {
 
         {/* Dynamic Panel */}
         <div style={{ padding: "32px 24px" }}>
-          {tab === "bookings" ? (
+          {tab === "bookings" && (
             <div>
               {/* Header */}
               <div style={styles.panelHeader}>
@@ -435,7 +506,9 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
-          ) : (
+          )}
+
+          {tab === "coupons" && (
             <div>
               {/* Coupons Panel */}
               <div style={styles.panelHeader}>
@@ -499,6 +572,65 @@ export default function AdminDashboard() {
                           >
                             {c.active ? "Deactivate" : "Activate"}
                           </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {tab === "users" && (
+            <div>
+              {/* Header */}
+              <div style={styles.panelHeader}>
+                <div>
+                  <h2 style={styles.panelTitle}>Registered Users</h2>
+                  <p style={styles.panelSub}>View and manage registered customers, their contact details, and bikes.</p>
+                </div>
+                <input
+                  style={styles.searchInput}
+                  placeholder="🔍 Search name, email, phone..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+
+              {/* Grid / Table */}
+              <div className="table-wrapper" style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.thRow}>
+                      <th style={styles.th}>Customer</th>
+                      <th style={styles.th}>Phone</th>
+                      <th style={styles.th}>Default Address</th>
+                      <th style={styles.th}>Garage Vehicle</th>
+                      <th style={styles.th}>Number Plate</th>
+                      <th style={styles.th}>Registered On</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={styles.tdEmpty}>No registered users found.</td>
+                      </tr>
+                    ) : filteredUsers.map(u => (
+                      <tr key={u.uid} style={styles.tr}>
+                        <td style={styles.td}>
+                          <div style={{ fontWeight: 600 }}>{u.name || "N/A"}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{u.email}</div>
+                        </td>
+                        <td style={styles.td}>+91 {u.phone || "N/A"}</td>
+                        <td style={{ ...styles.td, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {u.address || "No address saved"}
+                        </td>
+                        <td style={styles.td}>
+                          {u.bikeBrand || u.bikeModel ? `${u.bikeBrand || ""} ${u.bikeModel || ""}` : "No bike registered"}
+                        </td>
+                        <td style={{ ...styles.td, textTransform: "uppercase" }}>{u.bikeNumber || "N/A"}</td>
+                        <td style={styles.td}>
+                          {u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}
                         </td>
                       </tr>
                     ))}
