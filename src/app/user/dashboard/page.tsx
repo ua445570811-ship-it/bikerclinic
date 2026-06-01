@@ -162,7 +162,7 @@ export default function UserDashboard() {
       
       if (!IS_MOCK_MODE) {
         const userRef = doc(db, "users", uid);
-        await setDoc(userRef, {
+        setDoc(userRef, {
           uid,
           email: profile.email,
           name: profile.name,
@@ -172,7 +172,9 @@ export default function UserDashboard() {
           bikeModel: profile.bikeModel,
           bikeNumber: profile.bikeNumber,
           updatedAt: new Date().toISOString()
-        }, { merge: true });
+        }, { merge: merge }).catch((err) => {
+          console.error("Firestore background profile save failed:", err);
+        });
       }
 
       // Update local storage values

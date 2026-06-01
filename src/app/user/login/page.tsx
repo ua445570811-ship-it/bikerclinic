@@ -46,28 +46,41 @@ export default function UserLogin() {
           let userData: any = null;
           let userExists = false;
 
-          try {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists() && userDocSnap.data().phone) {
-              userData = userDocSnap.data();
-              userExists = true;
-            }
-          } catch (firestoreErr) {
-            console.warn("Firestore getDoc failed (possibly offline):", firestoreErr);
-            // Fallback to local storage
-            const cachedEmail = localStorage.getItem("bc_user_email");
-            const cachedPhone = localStorage.getItem("bc_user_phone");
-            if (cachedEmail === user.email && cachedPhone) {
-              userData = {
-                name: localStorage.getItem("bc_user_name") || user.displayName || "",
-                phone: cachedPhone,
-                address: localStorage.getItem("bc_user_address") || "",
-                bikeBrand: localStorage.getItem("bc_user_bike_brand") || "",
-                bikeModel: localStorage.getItem("bc_user_bike_model") || "",
-                bikeNumber: localStorage.getItem("bc_user_bike_number") || "",
-              };
-              userExists = true;
+          // Optimization: Check local cache first before network call!
+          const cachedEmail = localStorage.getItem("bc_user_email");
+          const cachedPhone = localStorage.getItem("bc_user_phone");
+          if (cachedEmail === user.email && cachedPhone) {
+            userData = {
+              name: localStorage.getItem("bc_user_name") || user.displayName || "",
+              phone: cachedPhone,
+              address: localStorage.getItem("bc_user_address") || "",
+              bikeBrand: localStorage.getItem("bc_user_bike_brand") || "",
+              bikeModel: localStorage.getItem("bc_user_bike_model") || "",
+              bikeNumber: localStorage.getItem("bc_user_bike_number") || "",
+            };
+            userExists = true;
+          }
+
+          if (!userExists) {
+            try {
+              const userDocRef = doc(db, "users", user.uid);
+              
+              // Set up a 2-second timeout for Firestore fetch
+              const timeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error("Firestore fetch timeout")), 2000)
+              );
+              
+              const userDocSnap = await Promise.race([
+                getDoc(userDocRef),
+                timeoutPromise
+              ]);
+
+              if (userDocSnap.exists() && userDocSnap.data().phone) {
+                userData = userDocSnap.data();
+                userExists = true;
+              }
+            } catch (firestoreErr) {
+              console.warn("Firestore getDoc failed or timed out:", firestoreErr);
             }
           }
 
@@ -124,19 +137,17 @@ export default function UserLogin() {
         localStorage.setItem("bc_user_bike_number", "");
         router.push("/user/dashboard");
       } else {
-        try {
-          // Save user profile to Firestore
-          await setDoc(doc(db, "users", tempUser.uid), {
-            uid: tempUser.uid,
-            email: tempUser.email,
-            name: tempUser.name,
-            phone: phone,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-        } catch (firestoreErr) {
-          console.warn("Firestore setDoc failed (offline), caching locally:", firestoreErr);
-        }
+        // Save user profile to Firestore in background (non-blocking)
+        setDoc(doc(db, "users", tempUser.uid), {
+          uid: tempUser.uid,
+          email: tempUser.email,
+          name: tempUser.name,
+          phone: phone,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }).catch((firestoreErr) => {
+          console.warn("Firestore setDoc failed in background:", firestoreErr);
+        });
 
         localStorage.setItem("bc_user_uid", tempUser.uid);
         localStorage.setItem("bc_user_email", tempUser.email);

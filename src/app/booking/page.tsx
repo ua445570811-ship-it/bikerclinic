@@ -84,7 +84,9 @@ export default function BookingPage() {
       };
 
       if (!IS_MOCK_MODE) {
-        await addDoc(collection(db, "bookings"), booking);
+        addDoc(collection(db, "bookings"), booking).catch((error) => {
+          console.error("Firestore background addDoc failed:", error);
+        });
       } else {
         const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
         localStorage.setItem("bc_bookings", JSON.stringify([...prev, booking]));
