@@ -51,6 +51,7 @@ export default function UserDashboard() {
   });
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [syncFailed, setSyncFailed] = useState(false);
 
   const loadBookings = useCallback((phone: string, email: string) => {
     const all: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
@@ -60,6 +61,9 @@ export default function UserDashboard() {
   }, []);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSyncFailed(localStorage.getItem("bc_last_sync_failed") === "true");
+    }
     const email = localStorage.getItem("bc_user_email") || "";
     const phone = localStorage.getItem("bc_user_phone") || "";
     if (!email && !phone) { router.push("/user/login"); return; }
@@ -172,8 +176,13 @@ export default function UserDashboard() {
           bikeModel: profile.bikeModel,
           bikeNumber: profile.bikeNumber,
           updatedAt: new Date().toISOString()
-        }, { merge: true }).catch((err) => {
+        }, { merge: true }).then(() => {
+          localStorage.removeItem("bc_last_sync_failed");
+          setSyncFailed(false);
+        }).catch((err) => {
           console.error("Firestore background profile save failed:", err);
+          localStorage.setItem("bc_last_sync_failed", "true");
+          setSyncFailed(true);
         });
       } else {
         // Save to local mock users list
@@ -243,6 +252,20 @@ export default function UserDashboard() {
 
       {/* Content */}
       <div style={{ ...s.container, paddingTop: 32, paddingBottom: 40 }}>
+        {syncFailed && (
+          <div style={{
+            background: "rgba(245, 158, 11, 0.08)",
+            border: "1px solid rgba(245, 158, 11, 0.2)",
+            color: "#F59E0B",
+            borderRadius: 12,
+            padding: "12px 16px",
+            fontSize: "0.85rem",
+            lineHeight: 1.4,
+            marginBottom: 20
+          }}>
+            <strong>⚠️ Database Connection Warning:</strong> We've saved your details locally on this device, but they could not be synced with our servers. Technicians will not see your updated profile or bookings until the cloud connection is active.
+          </div>
+        )}
 
         {/* Stats */}
         <div className="responsive-grid-3" style={{ marginBottom: 28 }}>

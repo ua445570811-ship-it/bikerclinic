@@ -3,10 +3,19 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { useEffect, useState } from "react";
+
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
   const name = searchParams.get("name") || "Rider";
+  const [syncFailed, setSyncFailed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSyncFailed(localStorage.getItem("bc_last_sync_failed") === "true");
+    }
+  }, []);
 
   return (
     <div style={s.page}>
@@ -16,6 +25,22 @@ function ConfirmationContent() {
       
       <div style={s.container}>
         <div style={s.card}>
+          {syncFailed && (
+            <div style={{
+              background: "rgba(245, 158, 11, 0.08)",
+              border: "1px solid rgba(245, 158, 11, 0.2)",
+              color: "#F59E0B",
+              borderRadius: 12,
+              padding: "12px 16px",
+              fontSize: "0.85rem",
+              lineHeight: 1.4,
+              textAlign: "left",
+              marginBottom: 24
+            }}>
+              <strong>⚠️ Cloud Sync Warning:</strong> Your booking is saved locally on this device, but could not be uploaded to our servers. Technicians will not see this booking until your database connectivity is restored.
+            </div>
+          )}
+
           <div style={s.successCircle}>
             <div style={s.checkmark}>✓</div>
           </div>

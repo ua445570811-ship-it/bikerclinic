@@ -157,6 +157,7 @@ export default function UserLogin() {
         router.push("/user/dashboard");
       } else {
         // Save user profile to Firestore in background (non-blocking)
+        localStorage.removeItem("bc_last_sync_failed");
         setDoc(doc(db, "users", tempUser.uid), {
           uid: tempUser.uid,
           email: tempUser.email,
@@ -166,6 +167,7 @@ export default function UserLogin() {
           updatedAt: new Date().toISOString()
         }).catch((firestoreErr) => {
           console.warn("Firestore setDoc failed in background:", firestoreErr);
+          localStorage.setItem("bc_last_sync_failed", "true");
         });
 
         localStorage.setItem("bc_user_uid", tempUser.uid);

@@ -84,8 +84,10 @@ export default function BookingPage() {
       };
 
       if (!IS_MOCK_MODE) {
+        localStorage.removeItem("bc_last_sync_failed");
         addDoc(collection(db, "bookings"), booking).catch((error) => {
           console.error("Firestore background addDoc failed:", error);
+          localStorage.setItem("bc_last_sync_failed", "true");
         });
       } else {
         const prev = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
@@ -99,6 +101,7 @@ export default function BookingPage() {
       router.push(`/confirmation?id=${id}&name=${encodeURIComponent(form.name)}`);
     } catch (error) {
       console.error("Error submitting booking: ", error);
+      localStorage.setItem("bc_last_sync_failed", "true");
       // Even if database fails, save to localStorage so the booking is not lost
       const id = generateId();
       const booking = {

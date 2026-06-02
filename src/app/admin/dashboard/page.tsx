@@ -173,6 +173,16 @@ export default function AdminDashboard() {
   const [couponValue, setCouponValue] = useState("");
   const [couponMsg, setCouponMsg] = useState("");
   const [mechanics, setMechanics] = useState<RegisteredMechanic[]>([]);
+  const [dbStatus, setDbStatus] = useState<{
+    mode: "live" | "mock";
+    connected: boolean;
+    error: string | null;
+  }>({
+    mode: IS_MOCK_MODE ? "mock" : "live",
+    connected: false,
+    error: null
+  });
+  const [diagOpen, setDiagOpen] = useState(false);
 
   const loadLocalData = () => {
     const rawC = JSON.parse(localStorage.getItem("bc_coupons") || "[]");
@@ -212,6 +222,7 @@ export default function AdminDashboard() {
 
     if (IS_MOCK_MODE) {
       loadData();
+      setDbStatus({ mode: "mock", connected: true, error: null });
       const interval = setInterval(loadData, 2000);
       return () => clearInterval(interval);
     } else {
@@ -224,8 +235,10 @@ export default function AdminDashboard() {
         });
         list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setBookings(list);
+        setDbStatus({ mode: "live", connected: true, error: null });
       }, (err) => {
         console.error("Firestore onSnapshot error, falling back to local storage polling:", err);
+        setDbStatus({ mode: "live", connected: false, error: err.message });
         loadData();
       });
 
@@ -238,8 +251,10 @@ export default function AdminDashboard() {
         });
         uList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setUsers(uList);
+        setDbStatus(prev => ({ ...prev, connected: true, error: null }));
       }, (err) => {
         console.error("Firestore users onSnapshot error:", err);
+        setDbStatus(prev => ({ ...prev, connected: false, error: err.message }));
       });
 
       return () => {
@@ -414,11 +429,46 @@ export default function AdminDashboard() {
             ☰
           </button>
           <div style={styles.topbarTitle}>Admin Dashboard</div>
-          <div style={styles.profileBadge}>Administrator</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div 
+              onClick={() => setDiagOpen(true)} 
+              style={{ 
+                ...styles.statusBadge, 
+                ...(dbStatus.mode === "mock" 
+                  ? styles.statusBadgeMock 
+                  : dbStatus.error 
+                    ? styles.statusBadgeError 
+                    : styles.statusBadgeLive) 
+              }}
+              title="Click to open DB Diagnostics"
+            >
+              {dbStatus.mode === "mock" ? "⚠️ Demo Mode" : dbStatus.error ? "🔴 DB Error" : "🟢 Live Sync"}
+            </div>
+            <div style={styles.profileBadge}>Administrator</div>
+          </div>
         </nav>
 
         {/* Dynamic Panel */}
         <div style={{ padding: "32px 24px" }}>
+          {/* Warning/Error Banners */}
+          {dbStatus.mode === "mock" && (
+            <div style={styles.warningBanner}>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: 4 }}>⚠️ Offline Demo Mode (Mock Data Active)</div>
+              <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.9, lineHeight: 1.4 }}>
+                Firebase is not configured in this environment. All bookings and users are stored locally in your browser's Local Storage. <strong>They will not sync across other devices or browsers.</strong> Click the status badge above to view configurations and instructions to go Live.
+              </p>
+            </div>
+          )}
+          
+          {dbStatus.error && (
+            <div style={styles.errorBanner}>
+              <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: 4 }}>🔴 Database Connection Failed</div>
+              <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.9, lineHeight: 1.4 }}>
+                Firestore error: <strong>{dbStatus.error}</strong>. Bookings and users are loading from offline local cache fallback. Please verify your Firestore Database has been created in the Firebase Console. Click the status badge above to run diagnostics.
+              </p>
+            </div>
+          )}
+
           {tab === "bookings" && (
             <div>
               {/* Header */}
@@ -641,6 +691,73 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
+
+      {/* Diagnostics Modal */}
+      {diagOpen && (
+        <div style={styles.modalOverlay} onClick={() => setDiagOpen(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={styles.modalTitle}>🔌 System Database Diagnostics</h3>
+              <button onClick={() => setDiagOpen(false)} style={styles.modalCloseIcon}>✕</button>
+            </div>
+            
+            <div style={styles.modalSection}>
+              <div style={styles.diagRow}>
+                <span style={styles.diagKey}>Connection Mode:</span>
+                <span style={{ 
+                  fontWeight: 700, 
+                  color: dbStatus.mode === "mock" ? "#F59E0B" : "#00E676" 
+                }}>
+                  {dbStatus.mode === "mock" ? "MOCK / DEMO WEB APP" : "LIVE CLOUD CONNECTED"}
+                </span>
+              </div>
+              <div style={styles.diagRow}>
+                <span style={styles.diagKey}>Firestore Link Status:</span>
+                <span style={{ 
+                  fontWeight: 700, 
+                  color: dbStatus.error ? "#EF4444" : "#00E676" 
+                }}>
+                  {dbStatus.error ? "DISCONNECTED / ERROR" : "CONNECTED / ACTIVE"}
+                </span>
+              </div>
+            </div>
+
+            {dbStatus.error && (
+              <div style={{ ...styles.modalSection, background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                <span style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#EF4444", textTransform: "uppercase", marginBottom: 6 }}>Error Details:</span>
+                <code style={{ fontSize: "0.8rem", color: "#F0F0F8", wordBreak: "break-word" }}>{dbStatus.error}</code>
+              </div>
+            )}
+
+            <div style={styles.modalSection}>
+              <h4 style={styles.sectionTitle}>Firebase Config Details</h4>
+              <div style={styles.diagRow}>
+                <span style={styles.diagKey}>Project ID:</span>
+                <span style={styles.diagVal}>{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "Not Set"}</span>
+              </div>
+              <div style={styles.diagRow}>
+                <span style={styles.diagKey}>Auth Domain:</span>
+                <span style={styles.diagVal}>{process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "Not Set"}</span>
+              </div>
+              <div style={styles.diagRow}>
+                <span style={styles.diagKey}>API Key Found:</span>
+                <span style={styles.diagVal}>{process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "Yes (AIzaSy...)" : "No"}</span>
+              </div>
+            </div>
+
+            <div style={{ ...styles.modalSection, border: "none", marginBottom: 0 }}>
+              <h4 style={styles.sectionTitle}>💡 How to fix Sync & Connection issues:</h4>
+              <ul style={styles.diagInstructions}>
+                <li><strong>Cloud Firestore API Status:</strong> Ensure the Cloud Firestore API is enabled in your Google Cloud Console.</li>
+                <li><strong>Firestore Database Creation:</strong> Go to your Firebase Console -> Firestore Database, and make sure you clicked <strong>"Create Database"</strong> (select <code>(default)</code> database ID). If it is not created, you will get a <code>NOT_FOUND</code> error.</li>
+                <li><strong>Vercel Deployments:</strong> If running on Vercel, navigate to Project Settings -> Environment Variables and add your keys (<code>NEXT_PUBLIC_FIREBASE_API_KEY</code>, etc.) then redeploy.</li>
+              </ul>
+            </div>
+            
+            <button onClick={() => setDiagOpen(false)} style={styles.modalCloseBtn}>Close Diagnostics</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -675,5 +792,22 @@ const styles: Record<string, React.CSSProperties> = {
   formInput: { flex: 1, minWidth: 150, background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "12px 14px", borderRadius: 10, outline: "none" },
   formSelect: { background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "12px", borderRadius: 10, outline: "none", cursor: "pointer" },
   submitBtn: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", padding: "0 24px", borderRadius: 10, fontWeight: 700, cursor: "pointer", height: 48 },
-  actionBtn: { padding: "6px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }
+  actionBtn: { padding: "6px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" },
+  statusBadge: { display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" },
+  statusBadgeMock: { background: "rgba(245,158,11,0.1)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.2)" },
+  statusBadgeLive: { background: "rgba(0,230,118,0.1)", color: "#00E676", border: "1px solid rgba(0,230,118,0.2)" },
+  statusBadgeError: { background: "rgba(239,68,68,0.1)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" },
+  warningBanner: { background: "#1E1611", border: "1px solid #3E2516", borderRadius: 12, padding: "16px", marginBottom: "24px", color: "#F59E0B" },
+  errorBanner: { background: "#1C1115", border: "1px solid #3D1A22", borderRadius: 12, padding: "16px", marginBottom: "24px", color: "#EF4444" },
+  modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(10,10,20,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
+  modal: { background: "#161622", border: "1px solid #2A2A3E", borderRadius: 20, padding: 32, width: "90%", maxWidth: 500, boxShadow: "0 20px 80px rgba(0,0,0,0.8)", display: "flex", flexDirection: "column" },
+  modalTitle: { fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "#F0F0F8" },
+  modalCloseIcon: { background: "transparent", border: "none", color: "#6B6B88", fontSize: "1.2rem", cursor: "pointer" },
+  modalSection: { borderBottom: "1px solid #1E1E2E", paddingBottom: 16, marginBottom: 16 },
+  diagRow: { display: "flex", justifyContent: "space-between", fontSize: "0.88rem", marginBottom: 8 },
+  diagKey: { color: "#9E9EB5" },
+  diagVal: { color: "#F0F0F8", fontWeight: 600, fontFamily: "monospace" },
+  sectionTitle: { fontSize: "0.85rem", fontWeight: 800, color: "#FF3D00", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px 0" },
+  diagInstructions: { margin: 0, paddingLeft: 18, color: "#9E9EB5", fontSize: "0.82rem", display: "flex", flexDirection: "column", gap: 8 },
+  modalCloseBtn: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", padding: "12px", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginTop: 8 }
 };

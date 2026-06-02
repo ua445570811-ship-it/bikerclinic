@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Rules for bookings collection
+    match /bookings/{bookingId} {
+      // Guests need to be able to create bookings and track their status
+      // Admins need to read, write, and update bookings
+      allow read, write: if true;
+    }
+    
+    // Rules for users collection
+    match /users/{userId} {
+      // Users need to read and update their profiles
+      // Admins need to query the registered users list
+      allow read, write: if true;
+    }
+  }
+}
