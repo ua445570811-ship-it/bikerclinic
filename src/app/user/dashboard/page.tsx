@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { db, IS_MOCK_MODE } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, or, doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, or, doc, getDoc, setDoc, addDoc } from "firebase/firestore";
 
 
 type Booking = {
@@ -39,7 +39,7 @@ export default function UserDashboard() {
   const [userPhone, setUserPhone] = useState("");
   const [userName, setUserName] = useState("");
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [tab, setTab] = useState<"active" | "history" | "profile">("active");
+  const [tab, setTab] = useState<"active" | "history" | "profile" | "review">("active");
   const [profile, setProfile] = useState({
     name: "",
     phone: "",
@@ -52,6 +52,54 @@ export default function UserDashboard() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
+
+  // Review states
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewBike, setReviewBike] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewComment.trim()) {
+      alert("Please write some comments first.");
+      return;
+    }
+    setReviewLoading(true);
+    setReviewSuccess(false);
+    try {
+      const email = localStorage.getItem("bc_user_email") || "rider@example.com";
+      const name = localStorage.getItem("bc_user_name") || "Demo Rider";
+      
+      const newReview = {
+        name,
+        email,
+        rating: reviewRating,
+        comment: reviewComment,
+        bike: reviewBike || `${profile.bikeBrand} ${profile.bikeModel}`.trim() || "My Bike",
+        createdAt: new Date().toISOString(),
+      };
+
+      if (!IS_MOCK_MODE) {
+        await addDoc(collection(db, "reviews"), newReview);
+      } else {
+        const prev = JSON.parse(localStorage.getItem("bc_reviews") || "[]");
+        localStorage.setItem("bc_reviews", JSON.stringify([...prev, newReview]));
+      }
+
+      setReviewComment("");
+      setReviewBike("");
+      setReviewRating(5);
+      setReviewSuccess(true);
+      setTimeout(() => setReviewSuccess(false), 4000);
+    } catch (err) {
+      console.error("Error submitting review:", err);
+      alert("Failed to submit review. Please try again.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   const loadBookings = useCallback((phone: string, email: string) => {
     const all: Booking[] = JSON.parse(localStorage.getItem("bc_bookings") || "[]");
@@ -292,6 +340,9 @@ export default function UserDashboard() {
           <button onClick={() => setTab("profile")} style={{ ...s.tabBtn, ...(tab === "profile" ? s.tabActive : {}) }}>
             👤 My Profile
           </button>
+          <button onClick={() => setTab("review")} style={{ ...s.tabBtn, ...(tab === "review" ? s.tabActive : {}) }}>
+            ⭐ Write Review
+          </button>
         </div>
 
         {/* Booking Cards */}
@@ -412,6 +463,78 @@ export default function UserDashboard() {
                 disabled={saveLoading}
               >
                 {saveLoading ? "Saving Changes..." : "💾 Save Profile Changes"}
+              </button>
+            </form>
+          </div>
+        ) : tab === "review" ? (
+          <div style={s.profileCard} className="booking-card anim-fade-up">
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 800, marginBottom: 6 }}>Write a Customer Review</h2>
+            <p style={{ color: "#6B6B88", fontSize: "0.9rem", marginBottom: 28 }}>
+              Share your BikerClinic experience with other riders! Your feedback helps us improve and builds trust in the community.
+            </p>
+
+            {reviewSuccess && (
+              <div style={{ background: "rgba(0, 230, 118, 0.1)", color: "#00E676", border: "1px solid rgba(0, 230, 118, 0.2)", borderRadius: 10, padding: "14px 16px", marginBottom: 20, fontSize: "0.9rem", fontWeight: 600 }}>
+                ✅ Thank you for your review! It will be featured on our homepage.
+              </div>
+            )}
+
+            <form onSubmit={handleReviewSubmit}>
+              <div style={s.formGroup}>
+                <label style={s.label}>Rating</label>
+                <div style={{ display: "flex", gap: 12, margin: "8px 0" }}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "2rem",
+                        cursor: "pointer",
+                        color: star <= reviewRating ? "#FFD600" : "#3A3A52",
+                        transition: "transform 0.1s",
+                      }}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={s.formGroup}>
+                <label style={s.label}>Bike Reviewed</label>
+                <input
+                  type="text"
+                  style={s.input}
+                  value={reviewBike}
+                  onChange={(e) => setReviewBike(e.target.value)}
+                  placeholder={
+                    profile.bikeBrand && profile.bikeModel
+                      ? `${profile.bikeBrand} ${profile.bikeModel}`
+                      : "e.g. Royal Enfield Classic 350"
+                  }
+                />
+              </div>
+
+              <div style={s.formGroup}>
+                <label style={s.label}>Your Review Comments</label>
+                <textarea
+                  style={{ ...s.input, minHeight: 120, resize: "vertical" }}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  required
+                  placeholder="Tell us about the service quality, technician professionalism, and booking speed..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                style={{ ...s.saveBtn, opacity: reviewLoading ? 0.7 : 1 }}
+                disabled={reviewLoading}
+              >
+                {reviewLoading ? "Submitting Review..." : "⭐ Submit Customer Review"}
               </button>
             </form>
           </div>

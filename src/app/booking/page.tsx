@@ -30,6 +30,7 @@ function tomorrow() {
 export default function BookingPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     serviceType: "doorstep" as ServiceType,
     service: "", package: "", brand: "", model: "", year: "",
@@ -40,24 +41,40 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const savedName = localStorage.getItem("bc_user_name") || "";
     const savedEmail = localStorage.getItem("bc_user_email") || "";
+    if (!savedEmail) {
+      router.push("/user/login?redirect=/booking");
+      return;
+    }
+
+    const savedName = localStorage.getItem("bc_user_name") || "";
     const savedPhone = localStorage.getItem("bc_user_phone") || "";
     const savedAddress = localStorage.getItem("bc_user_address") || "";
     const savedBrand = localStorage.getItem("bc_user_bike_brand") || "";
     const savedModel = localStorage.getItem("bc_user_bike_model") || "";
-    if (savedName || savedEmail || savedPhone || savedAddress || savedBrand || savedModel) {
-      setForm(f => ({
-        ...f,
-        name: f.name || savedName,
-        email: f.email || savedEmail,
-        phone: f.phone || savedPhone,
-        address: f.address || savedAddress,
-        brand: f.brand || savedBrand,
-        model: f.model || savedModel,
-      }));
-    }
-  }, []);
+    
+    setForm(f => ({
+      ...f,
+      name: f.name || savedName,
+      email: f.email || savedEmail,
+      phone: f.phone || savedPhone,
+      address: f.address || savedAddress,
+      brand: f.brand || savedBrand,
+      model: f.model || savedModel,
+    }));
+    setLoading(false);
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div style={{ ...s.page, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div className="spinner" style={{ width: 40, height: 40, border: "4px solid rgba(255,61,0,0.1)", borderTop: "4px solid #FF3D00", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          <div style={{ color: "#9E9EB5", fontSize: "0.95rem", fontWeight: 600 }}>🔒 Checking authentication...</div>
+        </div>
+      </div>
+    );
+  }
 
   const selectedPkg = PACKAGES.find(p => p.name === form.package);
   const basePrice = selectedPkg?.price || 0;

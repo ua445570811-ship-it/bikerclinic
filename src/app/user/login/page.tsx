@@ -1,25 +1,27 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { db, auth, IS_MOCK_MODE } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 
-export default function UserLogin() {
+function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<"login" | "phone">("login");
   const [phone, setPhone] = useState("");
   const [tempUser, setTempUser] = useState<{ uid: string; email: string; name: string } | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/user/dashboard";
 
   useEffect(() => {
-    // If already logged in, redirect to dashboard
+    // If already logged in, redirect to dashboard/target
     if (localStorage.getItem("bc_user_email")) {
-      router.push("/user/dashboard");
+      router.push(redirectUrl);
     }
-  }, [router]);
+  }, [router, redirectUrl]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -36,7 +38,7 @@ export default function UserLogin() {
         localStorage.setItem("bc_user_bike_brand", "Royal Enfield");
         localStorage.setItem("bc_user_bike_model", "Classic 350");
         localStorage.setItem("bc_user_bike_number", "KA 03 EX 1234");
-        router.push("/user/dashboard");
+        router.push(redirectUrl);
       } else {
         const provider = new GoogleAuthProvider();
         const result = await signInWithPopup(auth, provider);
@@ -93,7 +95,7 @@ export default function UserLogin() {
             localStorage.setItem("bc_user_bike_brand", userData.bikeBrand || "");
             localStorage.setItem("bc_user_bike_model", userData.bikeModel || "");
             localStorage.setItem("bc_user_bike_number", userData.bikeNumber || "");
-            router.push("/user/dashboard");
+            router.push(redirectUrl);
           } else {
             // Switch to phone stage
             setTempUser({
@@ -154,7 +156,7 @@ export default function UserLogin() {
           localStorage.setItem("bc_users", JSON.stringify(mockUsers));
         }
 
-        router.push("/user/dashboard");
+        router.push(redirectUrl);
       } else {
         // Save user profile to Firestore in background (non-blocking)
         localStorage.removeItem("bc_last_sync_failed");
@@ -178,7 +180,7 @@ export default function UserLogin() {
         localStorage.setItem("bc_user_bike_brand", "");
         localStorage.setItem("bc_user_bike_model", "");
         localStorage.setItem("bc_user_bike_number", "");
-        router.push("/user/dashboard");
+        router.push(redirectUrl);
       }
     } catch (err: any) {
       console.error("Error saving phone number:", err);
@@ -203,6 +205,12 @@ export default function UserLogin() {
         </div>
 
         <div style={styles.divider} />
+
+        {redirectUrl === "/booking" && (
+          <div style={styles.bookingLoginBadge}>
+            🔒 Login or Sign Up is required to complete your booking.
+          </div>
+        )}
 
         {stage === "login" ? (
           <>
@@ -452,4 +460,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: "1px solid #2A2A3E",
   },
   footerLink: { color: "#6B6B88", fontSize: "0.8rem" },
+  bookingLoginBadge: {
+    background: "rgba(255, 61, 0, 0.1)",
+    border: "1px solid rgba(255, 61, 0, 0.25)",
+    color: "#FF3D00",
+    borderRadius: 12,
+    padding: "12px 16px",
+    fontSize: "0.88rem",
+    fontWeight: 600,
+    marginBottom: 20,
+    textAlign: "center" as const,
+    lineHeight: 1.4,
+  },
 };
+
+export default function UserLogin() {
+  return (
+    <Suspense fallback={<div style={styles.page}><span style={styles.spinner} /></div>}>
+      <LoginForm />
+    </Suspense>
+  );
+}

@@ -15,5 +15,11 @@ service cloud.firestore {
       // Admins need to query the registered users list
       allow read, write: if true;
     }
+
+    // Rules for reviews collection
+    match /reviews/{reviewId} {
+      // Reviews are readable by anyone and writable by anyone
+      allow read, write: if true;
+    }
   }
 }
