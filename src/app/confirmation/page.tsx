@@ -2,7 +2,6 @@
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
-
 import { useEffect, useState } from "react";
 
 function ConfirmationContent() {
@@ -20,44 +19,52 @@ function ConfirmationContent() {
   return (
     <div style={s.page}>
       <nav style={s.nav}>
-        <Link href="/" style={s.logo}>🏍️ Biker<span style={{ color: "#FF3D00" }}>Clinic</span></Link>
+        <Link href="/" style={s.logo}>🏍️ Biker<span style={{ color: "var(--primary)" }}>Clinic</span></Link>
       </nav>
       
       <div style={s.container}>
         <div style={s.card}>
           {syncFailed && (
             <div style={{
-              background: "rgba(245, 158, 11, 0.08)",
+              background: "rgba(245, 158, 11, 0.05)",
               border: "1px solid rgba(245, 158, 11, 0.2)",
               color: "#F59E0B",
-              borderRadius: 12,
+              borderRadius: 8,
               padding: "12px 16px",
-              fontSize: "0.85rem",
-              lineHeight: 1.4,
+              fontSize: "0.82rem",
+              lineHeight: 1.45,
               textAlign: "left",
-              marginBottom: 24
+              marginBottom: 24,
+              fontWeight: 500
             }}>
-              <strong>⚠️ Cloud Sync Warning:</strong> Your booking is saved locally on this device, but could not be uploaded to our servers. Technicians will not see this booking until your database connectivity is restored.
+              <strong>⚠️ Cloud Sync Warning:</strong> Your booking is saved locally on this device, but could not be uploaded to our servers. Technicians will not see this booking until database connectivity is restored.
             </div>
           )}
 
           <div style={s.successCircle}>
-            <div style={s.checkmark}>✓</div>
+            <span style={{ fontSize: "2.4rem", color: "var(--primary)" }}>✓</span>
           </div>
           
-          <h1 style={s.title}>Booking Confirmed!</h1>
-          <p style={s.subtitle}>Thanks, {name}. Your bike is in good hands.</p>
+          <h1 style={s.title}>Booking Confirmed</h1>
+          <p style={s.subtitle}>Thanks, {name}. Your ride is queued for service.</p>
           
           <div style={s.idBox}>
             <div style={s.idLabel}>BOOKING ID</div>
-            <div style={s.idValue}>{id}</div>
+            <div style={s.idValue} className="mono-text">{id}</div>
           </div>
           
-          <p style={s.desc}>We've received your request. You'll get an SMS shortly when a mechanic is assigned to your job.</p>
+          <p style={s.desc}>We have logged your diagnostic request. You will receive an SMS notification as soon as a technician is dispatched.</p>
           
           <div style={s.actions}>
-            <Link href={`/track?id=${id}`} style={s.trackBtn}>📍 Track Live Status</Link>
-            <Link href="/" style={s.homeBtn}>Return to Home</Link>
+            <Link href={`/track?id=${id}`} style={s.trackBtn}>
+              TRACK LIVE STATUS
+              <span style={{ fontSize: "1.1rem" }}>📍</span>
+            </Link>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+              <Link href="/" style={s.homeBtn}>🏠 Home</Link>
+              <Link href="/booking" style={s.homeBtn}>🔧 Book Service</Link>
+              <Link href="/user/dashboard" style={s.homeBtn}>👤 My Garage</Link>
+            </div>
           </div>
         </div>
       </div>
@@ -67,27 +74,26 @@ function ConfirmationContent() {
 
 export default function ConfirmationPage() {
   return (
-    <Suspense fallback={<div style={s.page}>Loading...</div>}>
+    <Suspense fallback={<div style={s.page}>Loading confirmation details...</div>}>
       <ConfirmationContent />
     </Suspense>
   );
 }
 
 const s: Record<string, React.CSSProperties> = {
-  page: { background: "#0E0E18", minHeight: "100vh", display: "flex", flexDirection: "column" },
-  nav: { padding: "20px 32px", borderBottom: "1px solid #1E1E2E", background: "#0A0A14" },
-  logo: { fontSize: "1.2rem", fontWeight: 800, textDecoration: "none", color: "#F0F0F8" },
+  page: { background: "var(--bg)", minHeight: "100vh", display: "flex", flexDirection: "column", color: "var(--text-primary)" },
+  nav: { padding: "20px 32px", borderBottom: "1px solid var(--border)", background: "rgba(17, 19, 22, 0.95)" },
+  logo: { fontSize: "1.2rem", fontWeight: 900, textDecoration: "none", color: "var(--text-primary)", letterSpacing: "-0.02em" },
   container: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 },
-  card: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 20, padding: 40, width: "100%", maxWidth: 480, textAlign: "center" },
-  successCircle: { width: 80, height: 80, borderRadius: "50%", background: "rgba(0, 230, 118, 0.1)", border: "2px solid rgba(0, 230, 118, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" },
-  checkmark: { color: "#00E676", fontSize: "3rem", fontWeight: 800 },
-  title: { fontSize: "1.8rem", fontWeight: 800, marginBottom: 8 },
-  subtitle: { color: "#9E9EB5", fontSize: "1.05rem", marginBottom: 32 },
-  idBox: { background: "#0E0E18", border: "1px dashed #2A2A3E", borderRadius: 12, padding: "16px", marginBottom: 24 },
-  idLabel: { color: "#6B6B88", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 4 },
-  idValue: { color: "#FF3D00", fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.05em", fontFamily: "monospace" },
-  desc: { color: "#6B6B88", fontSize: "0.9rem", lineHeight: 1.6, marginBottom: 32 },
+  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 40, width: "100%", maxWidth: 480, textAlign: "center", boxShadow: "var(--shadow-lg)" },
+  successCircle: { width: 72, height: 72, borderRadius: "50%", background: "var(--primary-glow)", border: "1px solid rgba(0, 102, 255, 0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", boxShadow: "0 0 16px var(--primary-glow)" },
+  title: { fontSize: "1.6rem", fontWeight: 900, marginBottom: 8, letterSpacing: "-0.02em" },
+  subtitle: { color: "var(--text-secondary)", fontSize: "0.95rem", marginBottom: 32 },
+  idBox: { background: "var(--bg)", border: "1px dashed var(--border)", borderRadius: 10, padding: "16px", marginBottom: 24 },
+  idLabel: { color: "var(--text-muted)", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 4 },
+  idValue: { color: "var(--primary)", fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.05em" },
+  desc: { color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: 1.55, marginBottom: 32 },
   actions: { display: "flex", flexDirection: "column", gap: 12 },
-  trackBtn: { width: "100%", padding: 16, background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", borderRadius: 12, fontWeight: 800, fontSize: "1rem", cursor: "pointer", textDecoration: "none" },
-  homeBtn: { width: "100%", padding: 16, background: "transparent", color: "#6B6B88", border: "1px solid #2A2A3E", borderRadius: 12, fontWeight: 600, fontSize: "1rem", cursor: "pointer", textDecoration: "none" },
+  trackBtn: { width: "100%", padding: 16, background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 800, fontSize: "0.95rem", cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "var(--transition)", boxShadow: "0 4px 14px var(--primary-glow)" },
+  homeBtn: { flex: 1, minWidth: 120, padding: 12, background: "transparent", color: "var(--text-secondary)", border: "1px solid var(--border)", borderRadius: 8, fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", textDecoration: "none", transition: "var(--transition)", textAlign: "center" },
 };

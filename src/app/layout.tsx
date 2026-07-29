@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
-  title: "BikerClinic — Premium Bike Service Platform",
-  description: "Bangalore's #1 doorstep bike service platform. Book in 2 minutes.",
+  title: "BikerClinic — Premium Doorstep Bike Service Platform",
+  description: "Bangalore's #1 doorstep bike service platform. Book in 2 minutes. Precision tuned, expert mechanics.",
 };
 
 export default function RootLayout({
@@ -16,7 +24,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.variable} ${jetbrains.variable}`}>
+        {children}
+      </body>
     </html>
   );
 }

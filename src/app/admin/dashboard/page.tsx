@@ -173,16 +173,6 @@ export default function AdminDashboard() {
   const [couponValue, setCouponValue] = useState("");
   const [couponMsg, setCouponMsg] = useState("");
   const [mechanics, setMechanics] = useState<RegisteredMechanic[]>([]);
-  const [dbStatus, setDbStatus] = useState<{
-    mode: "live" | "mock";
-    connected: boolean;
-    error: string | null;
-  }>({
-    mode: IS_MOCK_MODE ? "mock" : "live",
-    connected: false,
-    error: null
-  });
-  const [diagOpen, setDiagOpen] = useState(false);
 
   const loadLocalData = () => {
     const rawC = JSON.parse(localStorage.getItem("bc_coupons") || "[]");
@@ -222,7 +212,6 @@ export default function AdminDashboard() {
 
     if (IS_MOCK_MODE) {
       loadData();
-      setDbStatus({ mode: "mock", connected: true, error: null });
       const interval = setInterval(loadData, 2000);
       return () => clearInterval(interval);
     } else {
@@ -235,10 +224,8 @@ export default function AdminDashboard() {
         });
         list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setBookings(list);
-        setDbStatus({ mode: "live", connected: true, error: null });
       }, (err) => {
         console.error("Firestore onSnapshot error, falling back to local storage polling:", err);
-        setDbStatus({ mode: "live", connected: false, error: err.message });
         loadData();
       });
 
@@ -251,10 +238,8 @@ export default function AdminDashboard() {
         });
         uList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         setUsers(uList);
-        setDbStatus(prev => ({ ...prev, connected: true, error: null }));
       }, (err) => {
         console.error("Firestore users onSnapshot error:", err);
-        setDbStatus(prev => ({ ...prev, connected: false, error: err.message }));
       });
 
       return () => {
@@ -403,7 +388,7 @@ export default function AdminDashboard() {
   return (
     <div style={styles.container}>
       {/* Sidebar */}
-      <aside className={`admin-sidebar ${mobileSidebarOpen ? "open" : ""}`} style={styles.sidebar}>
+      <aside className={`admin-sidebar ${mobileSidebarOpen ? "active" : ""}`} style={styles.sidebar}>
         <div style={styles.sidebarBrand}>🏍️ BikerClinic</div>
         <div style={styles.sidebarMenu}>
           <button onClick={() => { setTab("bookings"); setMobileSidebarOpen(false); }} style={{ ...styles.menuItem, ...(tab === "bookings" ? styles.menuItemActive : {}) }}>
@@ -429,46 +414,11 @@ export default function AdminDashboard() {
             ☰
           </button>
           <div style={styles.topbarTitle}>Admin Dashboard</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div 
-              onClick={() => setDiagOpen(true)} 
-              style={{ 
-                ...styles.statusBadge, 
-                ...(dbStatus.mode === "mock" 
-                  ? styles.statusBadgeMock 
-                  : dbStatus.error 
-                    ? styles.statusBadgeError 
-                    : styles.statusBadgeLive) 
-              }}
-              title="Click to open DB Diagnostics"
-            >
-              {dbStatus.mode === "mock" ? "⚠️ Demo Mode" : dbStatus.error ? "🔴 DB Error" : "🟢 Live Sync"}
-            </div>
-            <div style={styles.profileBadge}>Administrator</div>
-          </div>
+          <div style={styles.profileBadge}>Administrator</div>
         </nav>
 
         {/* Dynamic Panel */}
         <div style={{ padding: "32px 24px" }}>
-          {/* Warning/Error Banners */}
-          {dbStatus.mode === "mock" && (
-            <div style={styles.warningBanner}>
-              <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: 4 }}>⚠️ Offline Demo Mode (Mock Data Active)</div>
-              <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.9, lineHeight: 1.4 }}>
-                Firebase is not configured in this environment. All bookings and users are stored locally in your browser's Local Storage. <strong>They will not sync across other devices or browsers.</strong> Click the status badge above to view configurations and instructions to go Live.
-              </p>
-            </div>
-          )}
-          
-          {dbStatus.error && (
-            <div style={styles.errorBanner}>
-              <div style={{ fontWeight: 700, fontSize: "0.95rem", marginBottom: 4 }}>🔴 Database Connection Failed</div>
-              <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.9, lineHeight: 1.4 }}>
-                Firestore error: <strong>{dbStatus.error}</strong>. Bookings and users are loading from offline local cache fallback. Please verify your Firestore Database has been created in the Firebase Console. Click the status badge above to run diagnostics.
-              </p>
-            </div>
-          )}
-
           {tab === "bookings" && (
             <div>
               {/* Header */}
@@ -494,7 +444,7 @@ export default function AdminDashboard() {
                       <th style={styles.th}>Customer</th>
                       <th style={styles.th}>Vehicle</th>
                       <th style={styles.th}>Schedule</th>
-                      <th style={styles.th}>Service Type</th>
+                      <th style={styles.th}>Specialty</th>
                       <th style={styles.th}>Assign Mechanic</th>
                       <th style={styles.th}>Status</th>
                     </tr>
@@ -506,21 +456,21 @@ export default function AdminDashboard() {
                       </tr>
                     ) : filtered.map(b => (
                       <tr key={b.id} style={styles.tr}>
-                        <td style={{ ...styles.td, fontWeight: 700, color: "#6366F1" }}>
-                          <Link href={`/track?id=${b.id}`} style={{ color: "#6366F1", textDecoration: "none" }}>{b.id}</Link>
+                        <td style={{ ...styles.td, fontWeight: 700, color: "var(--primary)" }}>
+                          <Link href={`/track?id=${b.id}`} style={{ color: "var(--primary)", textDecoration: "none" }} className="mono-text">{b.id}</Link>
                         </td>
                         <td style={styles.td}>
                           <div style={{ fontWeight: 600 }}>{b.name}</div>
-                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.phone}</div>
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{b.phone}</div>
                         </td>
                         <td style={styles.td}>{b.brand} {b.model}</td>
                         <td style={styles.td}>
                           <div>{b.date}</div>
-                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.time}</div>
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{b.time}</div>
                         </td>
                         <td style={styles.td}>
                           <div style={{ textTransform: "capitalize" }}>{b.serviceType}</div>
-                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{b.service}{b.package ? ` (${b.package})` : ""}</div>
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{b.service}{b.package ? ` (${b.package})` : ""}</div>
                         </td>
                         <td style={styles.td}>
                           <select
@@ -538,7 +488,7 @@ export default function AdminDashboard() {
                           <select
                             style={{
                               ...styles.select,
-                              color: b.status === "Completed" ? "#00E676" : b.status === "In Progress" ? "#FF3D00" : b.status === "Assigned" ? "#F59E0B" : "#F0F0F8",
+                              color: b.status === "Completed" ? "var(--success)" : b.status === "In Progress" ? "var(--accent)" : b.status === "Assigned" ? "var(--mechanic-accent)" : "var(--text-primary)",
                               fontWeight: 700
                             }}
                             value={b.status}
@@ -580,7 +530,7 @@ export default function AdminDashboard() {
                   <input style={styles.formInput} type="number" placeholder="Value" value={couponValue} onChange={e => setCouponValue(e.target.value)} required />
                   <button type="submit" style={styles.submitBtn}>Add Coupon</button>
                 </form>
-                {couponMsg && <div style={{ marginTop: 12, color: "#00E676", fontSize: "0.9rem", fontWeight: 600 }}>{couponMsg}</div>}
+                {couponMsg && <div style={{ marginTop: 12, color: "var(--success)", fontSize: "0.9rem", fontWeight: 600 }}>{couponMsg}</div>}
               </div>
 
               {/* Coupons Table */}
@@ -602,11 +552,11 @@ export default function AdminDashboard() {
                       </tr>
                     ) : coupons.map(c => (
                       <tr key={c.code} style={styles.tr}>
-                        <td style={{ ...styles.td, fontWeight: 700, color: "#FF3D00" }}>{c.code}</td>
+                        <td style={{ ...styles.td, fontWeight: 700, color: "var(--accent)" }} className="mono-text">{c.code}</td>
                         <td style={styles.td}>{c.type === "flat" ? "Flat Rate" : "Percentage"}</td>
-                        <td style={styles.td}>{c.type === "flat" ? `₹${c.value}` : `${c.value}%`}</td>
+                        <td style={styles.td} className="mono-text">{c.type === "flat" ? `₹${c.value}` : `${c.value}%`}</td>
                         <td style={styles.td}>
-                          <span style={{ color: c.active ? "#00E676" : "#EF4444", fontWeight: 700 }}>
+                          <span style={{ color: c.active ? "var(--success)" : "var(--error)", fontWeight: 700 }}>
                             {c.active ? "Active" : "Inactive"}
                           </span>
                         </td>
@@ -615,9 +565,9 @@ export default function AdminDashboard() {
                             onClick={() => toggleCoupon(c.code, c.active)}
                             style={{
                               ...styles.actionBtn,
-                              background: c.active ? "rgba(239,68,68,0.1)" : "rgba(0,230,118,0.1)",
-                              color: c.active ? "#EF4444" : "#00E676",
-                              border: `1px solid ${c.active ? "rgba(239,68,68,0.2)" : "rgba(0,230,118,0.2)"}`
+                              background: c.active ? "rgba(239,68,68,0.05)" : "rgba(0,230,118,0.05)",
+                              color: c.active ? "var(--error)" : "var(--success)",
+                              border: `1px solid ${c.active ? "rgba(239,68,68,0.15)" : "rgba(0,230,118,0.15)"}`
                             }}
                           >
                             {c.active ? "Deactivate" : "Activate"}
@@ -669,17 +619,17 @@ export default function AdminDashboard() {
                       <tr key={u.uid} style={styles.tr}>
                         <td style={styles.td}>
                           <div style={{ fontWeight: 600 }}>{u.name || "N/A"}</div>
-                          <div style={{ fontSize: "0.8rem", color: "#6B6B88" }}>{u.email}</div>
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{u.email}</div>
                         </td>
-                        <td style={styles.td}>+91 {u.phone || "N/A"}</td>
+                        <td style={styles.td} className="mono-text">+91 {u.phone || "N/A"}</td>
                         <td style={{ ...styles.td, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {u.address || "No address saved"}
                         </td>
                         <td style={styles.td}>
                           {u.bikeBrand || u.bikeModel ? `${u.bikeBrand || ""} ${u.bikeModel || ""}` : "No bike registered"}
                         </td>
-                        <td style={{ ...styles.td, textTransform: "uppercase" }}>{u.bikeNumber || "N/A"}</td>
-                        <td style={styles.td}>
+                        <td style={{ ...styles.td, textTransform: "uppercase" }} className="mono-text">{u.bikeNumber || "N/A"}</td>
+                        <td style={styles.td} className="mono-text">
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}
                         </td>
                       </tr>
@@ -691,123 +641,39 @@ export default function AdminDashboard() {
           )}
         </div>
       </main>
-
-      {/* Diagnostics Modal */}
-      {diagOpen && (
-        <div style={styles.modalOverlay} onClick={() => setDiagOpen(false)}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={styles.modalTitle}>🔌 System Database Diagnostics</h3>
-              <button onClick={() => setDiagOpen(false)} style={styles.modalCloseIcon}>✕</button>
-            </div>
-            
-            <div style={styles.modalSection}>
-              <div style={styles.diagRow}>
-                <span style={styles.diagKey}>Connection Mode:</span>
-                <span style={{ 
-                  fontWeight: 700, 
-                  color: dbStatus.mode === "mock" ? "#F59E0B" : "#00E676" 
-                }}>
-                  {dbStatus.mode === "mock" ? "MOCK / DEMO WEB APP" : "LIVE CLOUD CONNECTED"}
-                </span>
-              </div>
-              <div style={styles.diagRow}>
-                <span style={styles.diagKey}>Firestore Link Status:</span>
-                <span style={{ 
-                  fontWeight: 700, 
-                  color: dbStatus.error ? "#EF4444" : "#00E676" 
-                }}>
-                  {dbStatus.error ? "DISCONNECTED / ERROR" : "CONNECTED / ACTIVE"}
-                </span>
-              </div>
-            </div>
-
-            {dbStatus.error && (
-              <div style={{ ...styles.modalSection, background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: 12, marginBottom: 16 }}>
-                <span style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#EF4444", textTransform: "uppercase", marginBottom: 6 }}>Error Details:</span>
-                <code style={{ fontSize: "0.8rem", color: "#F0F0F8", wordBreak: "break-word" }}>{dbStatus.error}</code>
-              </div>
-            )}
-
-            <div style={styles.modalSection}>
-              <h4 style={styles.sectionTitle}>Firebase Config Details</h4>
-              <div style={styles.diagRow}>
-                <span style={styles.diagKey}>Project ID:</span>
-                <span style={styles.diagVal}>{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "Not Set"}</span>
-              </div>
-              <div style={styles.diagRow}>
-                <span style={styles.diagKey}>Auth Domain:</span>
-                <span style={styles.diagVal}>{process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "Not Set"}</span>
-              </div>
-              <div style={styles.diagRow}>
-                <span style={styles.diagKey}>API Key Found:</span>
-                <span style={styles.diagVal}>{process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "Yes (AIzaSy...)" : "No"}</span>
-              </div>
-            </div>
-
-            <div style={{ ...styles.modalSection, border: "none", marginBottom: 0 }}>
-              <h4 style={styles.sectionTitle}>💡 How to fix Sync & Connection issues:</h4>
-              <ul style={styles.diagInstructions}>
-                <li><strong>Cloud Firestore API Status:</strong> Ensure the Cloud Firestore API is enabled in your Google Cloud Console.</li>
-                <li><strong>Firestore Database Creation:</strong> Go to your Firebase Console -> Firestore Database, and make sure you clicked <strong>"Create Database"</strong> (select <code>(default)</code> database ID). If it is not created, you will get a <code>NOT_FOUND</code> error.</li>
-                <li><strong>Vercel Deployments:</strong> If running on Vercel, navigate to Project Settings -> Environment Variables and add your keys (<code>NEXT_PUBLIC_FIREBASE_API_KEY</code>, etc.) then redeploy.</li>
-              </ul>
-            </div>
-            
-            <button onClick={() => setDiagOpen(false)} style={styles.modalCloseBtn}>Close Diagnostics</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { display: "flex", minHeight: "100vh", background: "#0E0E18" },
-  sidebar: { width: 260, background: "#0A0A14", borderRight: "1px solid #1E1E2E", display: "flex", flexDirection: "column", padding: 24, zIndex: 99 },
-  sidebarBrand: { fontSize: "1.3rem", fontWeight: 800, marginBottom: 40, color: "#F0F0F8" },
+  container: { display: "flex", minHeight: "100vh", background: "var(--bg)", color: "var(--text-primary)" },
+  sidebar: { width: 260, background: "#0c0e11", borderRight: "1px solid var(--border)", display: "flex", flexDirection: "column", padding: 24, zIndex: 99 },
+  sidebarBrand: { fontSize: "1.25rem", fontWeight: 900, marginBottom: 40, color: "var(--text-primary)", letterSpacing: "-0.02em" },
   sidebarMenu: { display: "flex", flexDirection: "column", gap: 8, flex: 1 },
-  menuItem: { background: "transparent", border: "none", color: "#6B6B88", padding: "12px 16px", borderRadius: 10, textAlign: "left", fontSize: "0.95rem", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" },
-  menuItemActive: { background: "rgba(255,61,0,0.1)", color: "#FF3D00" },
-  logoutBtn: { background: "transparent", border: "1px solid #2A2A3E", color: "#6B6B88", padding: "10px", borderRadius: 10, cursor: "pointer" },
+  menuItem: { background: "transparent", border: "none", color: "var(--text-muted)", padding: "12px 16px", borderRadius: 8, textAlign: "left", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", transition: "var(--transition)" },
+  menuItemActive: { background: "var(--primary-glow)", color: "var(--primary)" },
+  logoutBtn: { background: "transparent", border: "1px solid var(--border)", color: "var(--text-secondary)", padding: "10px", borderRadius: 8, cursor: "pointer", transition: "var(--transition)", fontWeight: 600 },
   mainContent: { flex: 1, display: "flex", flexDirection: "column" },
-  topbar: { height: 70, background: "#0A0A14", borderBottom: "1px solid #1E1E2E", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px" },
-  toggleBtn: { display: "none", background: "transparent", border: "none", color: "#F0F0F8", fontSize: "1.5rem", cursor: "pointer" },
-  topbarTitle: { fontSize: "1.1rem", fontWeight: 700 },
-  profileBadge: { background: "rgba(99,102,241,0.1)", color: "#6366F1", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "6px 12px", fontSize: "0.82rem", fontWeight: 700 },
+  topbar: { height: 70, background: "#0c0e11", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px" },
+  toggleBtn: { display: "none", background: "transparent", border: "none", color: "var(--text-primary)", fontSize: "1.5rem", cursor: "pointer" },
+  topbarTitle: { fontSize: "1.1rem", fontWeight: 800, letterSpacing: "-0.01em" },
+  profileBadge: { background: "var(--primary-glow)", color: "var(--primary)", border: "1px solid rgba(0,102,255,0.2)", borderRadius: 6, padding: "6px 12px", fontSize: "0.82rem", fontWeight: 700 },
   panelHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, marginBottom: 28 },
-  panelTitle: { fontSize: "1.5rem", fontWeight: 800, marginBottom: 6 },
-  panelSub: { color: "#6B6B88", fontSize: "0.9rem" },
-  searchInput: { background: "#161622", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "10px 16px", borderRadius: 10, outline: "none", fontSize: "0.9rem", width: 260 },
-  tableWrapper: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, overflow: "hidden" },
+  panelTitle: { fontSize: "1.45rem", fontWeight: 900, marginBottom: 6, letterSpacing: "-0.02em" },
+  panelSub: { color: "var(--text-muted)", fontSize: "0.9rem" },
+  searchInput: { background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "10px 16px", borderRadius: 8, outline: "none", fontSize: "0.9rem", width: 260, transition: "var(--transition)" },
+  tableWrapper: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" },
   table: { width: "100%", borderCollapse: "collapse", textAlign: "left" },
-  thRow: { background: "#0A0A14", borderBottom: "1px solid #1E1E2E" },
-  th: { padding: "16px 20px", fontSize: "0.8rem", fontWeight: 700, color: "#9E9EB5", textTransform: "uppercase", letterSpacing: "0.05em" },
-  tr: { borderBottom: "1px solid #1E1E2E", transition: "background 0.2s" },
-  td: { padding: "18px 20px", fontSize: "0.9rem", color: "#F0F0F8" },
-  tdEmpty: { padding: "40px", textAlign: "center", color: "#6B6B88" },
-  select: { background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "8px 12px", borderRadius: 8, outline: "none", cursor: "pointer", width: "100%" },
-  card: { background: "#161622", border: "1px solid #1E1E2E", borderRadius: 16, padding: 24, marginBottom: 28 },
+  thRow: { background: "#0c0e11", borderBottom: "1px solid var(--border)" },
+  th: { padding: "16px 20px", fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" },
+  tr: { borderBottom: "1px solid var(--border)", transition: "background 0.2s" },
+  td: { padding: "18px 20px", fontSize: "0.9rem", color: "var(--text-primary)" },
+  tdEmpty: { padding: "40px", textAlign: "center", color: "var(--text-muted)" },
+  select: { background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "8px 12px", borderRadius: 8, outline: "none", cursor: "pointer", width: "100%", transition: "var(--transition)" },
+  card: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 24, marginBottom: 28 },
   formInline: { display: "flex", gap: 12, flexWrap: "wrap" },
-  formInput: { flex: 1, minWidth: 150, background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "12px 14px", borderRadius: 10, outline: "none" },
-  formSelect: { background: "#0E0E18", border: "1px solid #2A2A3E", color: "#F0F0F8", padding: "12px", borderRadius: 10, outline: "none", cursor: "pointer" },
-  submitBtn: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", padding: "0 24px", borderRadius: 10, fontWeight: 700, cursor: "pointer", height: 48 },
-  actionBtn: { padding: "6px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" },
-  statusBadge: { display: "inline-flex", alignItems: "center", padding: "6px 12px", borderRadius: 8, fontSize: "0.82rem", fontWeight: 700, cursor: "pointer", transition: "all 0.2s" },
-  statusBadgeMock: { background: "rgba(245,158,11,0.1)", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.2)" },
-  statusBadgeLive: { background: "rgba(0,230,118,0.1)", color: "#00E676", border: "1px solid rgba(0,230,118,0.2)" },
-  statusBadgeError: { background: "rgba(239,68,68,0.1)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" },
-  warningBanner: { background: "#1E1611", border: "1px solid #3E2516", borderRadius: 12, padding: "16px", marginBottom: "24px", color: "#F59E0B" },
-  errorBanner: { background: "#1C1115", border: "1px solid #3D1A22", borderRadius: 12, padding: "16px", marginBottom: "24px", color: "#EF4444" },
-  modalOverlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(10,10,20,0.85)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 },
-  modal: { background: "#161622", border: "1px solid #2A2A3E", borderRadius: 20, padding: 32, width: "90%", maxWidth: 500, boxShadow: "0 20px 80px rgba(0,0,0,0.8)", display: "flex", flexDirection: "column" },
-  modalTitle: { fontSize: "1.2rem", fontWeight: 800, margin: 0, color: "#F0F0F8" },
-  modalCloseIcon: { background: "transparent", border: "none", color: "#6B6B88", fontSize: "1.2rem", cursor: "pointer" },
-  modalSection: { borderBottom: "1px solid #1E1E2E", paddingBottom: 16, marginBottom: 16 },
-  diagRow: { display: "flex", justifyContent: "space-between", fontSize: "0.88rem", marginBottom: 8 },
-  diagKey: { color: "#9E9EB5" },
-  diagVal: { color: "#F0F0F8", fontWeight: 600, fontFamily: "monospace" },
-  sectionTitle: { fontSize: "0.85rem", fontWeight: 800, color: "#FF3D00", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px 0" },
-  diagInstructions: { margin: 0, paddingLeft: 18, color: "#9E9EB5", fontSize: "0.82rem", display: "flex", flexDirection: "column", gap: 8 },
-  modalCloseBtn: { background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", padding: "12px", borderRadius: 10, fontWeight: 700, cursor: "pointer", marginTop: 8 }
+  formInput: { flex: 1, minWidth: 150, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "12px 14px", borderRadius: 8, outline: "none", transition: "var(--transition)" },
+  formSelect: { background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-primary)", padding: "12px", borderRadius: 8, outline: "none", cursor: "pointer", transition: "var(--transition)" },
+  submitBtn: { background: "var(--primary)", color: "#fff", border: "none", padding: "0 24px", borderRadius: 8, fontWeight: 700, cursor: "pointer", height: 48, transition: "var(--transition)", boxShadow: "0 4px 12px var(--primary-glow)" },
+  actionBtn: { padding: "6px 12px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", transition: "var(--transition)" }
 };

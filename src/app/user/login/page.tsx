@@ -5,7 +5,6 @@ import { db, auth, IS_MOCK_MODE } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-
 function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -192,14 +191,16 @@ function LoginForm() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.glowRed} />
-      <div style={styles.glowGreen} />
+      <div style={styles.glowBlue} />
+      <div style={styles.glowDark} />
 
       <div className="booking-card anim-fade-up" style={styles.card}>
         <div style={styles.logoRow}>
-          <div style={styles.logoIcon}>🏍️</div>
+          <div style={styles.logoIcon}>
+            <span className="material-symbols-outlined" style={{ fontSize: "1.5rem", color: "var(--primary)" }}>motorcycle</span>
+          </div>
           <div>
-            <div style={styles.logoText}>Biker<span style={{ color: "#FF3D00" }}>Clinic</span></div>
+            <div style={styles.logoText}>Biker<span style={{ color: "var(--primary)" }}>Clinic</span></div>
             <div style={styles.logoSub}>Customer Garage Portal</div>
           </div>
         </div>
@@ -208,7 +209,7 @@ function LoginForm() {
 
         {redirectUrl === "/booking" && (
           <div style={styles.bookingLoginBadge}>
-            🔒 Login or Sign Up is required to complete your booking.
+            🔒 Authentication is required to complete your booking.
           </div>
         )}
 
@@ -219,7 +220,7 @@ function LoginForm() {
 
             {IS_MOCK_MODE && (
               <div style={styles.otpSentBadge}>
-                💡 Firebase is in Demo Mode. Clicking the Google button will log you in with a demo account instantly.
+                💡 Demo Mode Active. Accessing with Google will log you in instantly.
               </div>
             )}
 
@@ -231,10 +232,9 @@ function LoginForm() {
               disabled={loading}
             >
               {loading ? (
-                <span style={styles.spinner} />
+                <span className="spinner" style={styles.spinner} />
               ) : (
                 <>
-                  {/* Inline SVG Google Icon */}
                   <svg width="20" height="20" viewBox="0 0 24 24" style={{ marginRight: 10 }}>
                     <path fill="#EA4335" d="M12 5.04c1.67 0 3.17.58 4.35 1.71l3.25-3.25C17.63 1.63 15.01 1 12 1 7.37 1 3.4 3.66 1.48 7.55l3.86 3C6.26 7.56 8.9 5.04 12 5.04z" />
                     <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.44c-.28 1.47-1.11 2.71-2.35 3.55l3.65 2.83c2.13-1.97 3.75-4.87 3.75-8.48z" />
@@ -255,19 +255,19 @@ function LoginForm() {
 
             <form onSubmit={handlePhoneSubmit}>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "#9E9EB5", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Mobile Number</label>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Mobile Number</label>
                 <div style={styles.phoneRow}>
                   <div style={styles.countryCode}>🇮🇳 +91</div>
                   <input
                     type="tel"
                     style={{
                       width: "100%",
-                      background: "#0E0E18",
-                      border: "1px solid #2A2A3E",
-                      borderRadius: "12px",
+                      background: "var(--bg)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
                       padding: "13px 14px",
                       paddingLeft: 88,
-                      color: "#F0F0F8",
+                      color: "var(--text-primary)",
                       fontSize: "0.95rem",
                       outline: "none"
                     }}
@@ -282,10 +282,10 @@ function LoginForm() {
 
               <button
                 type="submit"
-                style={{ ...styles.submitBtn, background: "linear-gradient(135deg, #FF3D00, #cc3000)", color: "#fff", border: "none", opacity: loading ? 0.7 : 1 }}
+                style={{ ...styles.submitBtn, background: "var(--primary)", color: "#fff", opacity: loading ? 0.7 : 1 }}
                 disabled={loading}
               >
-                {loading ? <span style={{ ...styles.spinner, borderTopColor: "#fff", borderLeftColor: "#fff" }} /> : "Complete Registration →"}
+                {loading ? <span className="spinner" style={{ width: 20, height: 20, border: "3px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", display: "inline-block" }} /> : "Complete Registration →"}
               </button>
               
               <button
@@ -300,9 +300,9 @@ function LoginForm() {
         )}
 
         <div style={styles.footer}>
-          <a href="/" style={styles.footerLink}>← Back to Site</a>
-          <a href="/admin/login" style={styles.footerLink}>Admin Portal</a>
-          <a href="/mechanic/login" style={styles.footerLink}>Mechanic Portal</a>
+          <a href="/" style={styles.footerLink}>← Public Site</a>
+          <a href="/admin/login" style={styles.footerLink}>Admin Console</a>
+          <a href="/mechanic/login" style={styles.footerLink}>Technician Portal</a>
         </div>
       </div>
     </div>
@@ -318,37 +318,37 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "24px",
     position: "relative",
     overflow: "hidden",
-    background: "#0E0E18",
+    background: "var(--bg)",
+    color: "var(--text-primary)"
   },
-  glowRed: {
+  glowBlue: {
     position: "absolute",
     width: 500,
     height: 500,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,61,0,0.1) 0%, transparent 70%)",
+    background: "radial-gradient(circle, var(--primary-glow) 0%, transparent 70%)",
     top: -100,
     left: -100,
     pointerEvents: "none",
   },
-  glowGreen: {
+  glowDark: {
     position: "absolute",
     width: 400,
     height: 400,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(0,230,118,0.06) 0%, transparent 70%)",
+    background: "radial-gradient(circle, rgba(255,255,255,0.01) 0%, transparent 70%)",
     bottom: -80,
     right: -80,
     pointerEvents: "none",
   },
   card: {
-    background: "rgba(22, 22, 34, 0.95)",
-    backdropFilter: "blur(20px)",
-    border: "1px solid #2A2A3E",
-    borderRadius: 20,
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 16,
     padding: "40px",
     width: "100%",
     maxWidth: 460,
-    boxShadow: "0 8px 60px rgba(0,0,0,0.6)",
+    boxShadow: "var(--shadow-lg)",
     position: "relative",
     zIndex: 1,
   },
@@ -361,24 +361,23 @@ const styles: Record<string, React.CSSProperties> = {
   logoIcon: {
     width: 48,
     height: 48,
-    borderRadius: 12,
-    background: "rgba(255,61,0,0.1)",
+    borderRadius: 8,
+    background: "var(--primary-glow)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "1.5rem",
-    border: "1px solid rgba(255,61,0,0.2)",
+    border: "1px solid rgba(0,102,255,0.2)",
   },
-  logoText: { fontSize: "1.2rem", fontWeight: 700, lineHeight: 1.2 },
-  logoSub: { fontSize: "0.75rem", color: "#00E676", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" },
+  logoText: { fontSize: "1.25rem", fontWeight: 900, lineHeight: 1.2, letterSpacing: "-0.02em" },
+  logoSub: { fontSize: "0.75rem", color: "var(--success)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" },
   divider: {
     height: 1,
-    background: "linear-gradient(to right, #FF3D00, transparent)",
+    background: "linear-gradient(to right, var(--primary), transparent)",
     marginBottom: 28,
-    opacity: 0.5,
+    opacity: 0.3,
   },
-  heading: { fontSize: "1.6rem", fontWeight: 700, marginBottom: 8 },
-  subheading: { color: "#6B6B88", fontSize: "0.9rem", marginBottom: 28, lineHeight: 1.5 },
+  heading: { fontSize: "1.5rem", fontWeight: 800, marginBottom: 8, letterSpacing: "-0.02em" },
+  subheading: { color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: 28, lineHeight: 1.5 },
   phoneRow: { position: "relative", display: "flex", width: "100%" },
   countryCode: {
     position: "absolute",
@@ -393,23 +392,23 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
     zIndex: 2,
     pointerEvents: "none",
-    borderRight: "1px solid #2A2A3E",
-    color: "#B0B0C8",
-    borderRadius: "12px 0 0 12px",
+    borderRight: "1px solid var(--border)",
+    color: "var(--text-secondary)",
+    borderRadius: "8px 0 0 8px",
   },
   otpSentBadge: {
-    background: "rgba(99,102,241,0.1)",
-    border: "1px solid rgba(99,102,241,0.2)",
-    color: "#818cf8",
+    background: "var(--primary-glow)",
+    border: "1px solid rgba(0,102,255,0.2)",
+    color: "var(--primary)",
     borderRadius: 8,
     padding: "10px 14px",
     fontSize: "0.85rem",
-    fontWeight: 600,
+    fontWeight: 700,
     marginBottom: 20,
   },
   errorMsg: {
-    background: "rgba(239,68,68,0.1)",
-    border: "1px solid rgba(239,68,68,0.3)",
+    background: "rgba(239,68,68,0.05)",
+    border: "1px solid rgba(239,68,68,0.2)",
     color: "#EF4444",
     borderRadius: 8,
     padding: "12px 16px",
@@ -421,33 +420,34 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "16px",
     background: "#fff",
     color: "#0F172A",
-    border: "1px solid #E2E8F0",
-    borderRadius: 12,
+    border: "1px solid var(--border)",
+    borderRadius: 8,
     fontWeight: 700,
     fontSize: "1rem",
     cursor: "pointer",
-    transition: "all 0.2s",
+    transition: "var(--transition)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+    boxShadow: "0 4px 14px var(--primary-glow)",
   },
   backBtn: {
     width: "100%",
     marginTop: 12,
     padding: "12px",
     background: "transparent",
-    border: "1px solid #2A2A3E",
-    borderRadius: 12,
-    color: "#6B6B88",
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    color: "var(--text-secondary)",
     fontSize: "0.9rem",
     cursor: "pointer",
+    transition: "var(--transition)",
   },
   spinner: {
     width: 20,
     height: 20,
-    border: "3px solid rgba(15,23,42,0.3)",
-    borderTop: "3px solid #0F172A",
+    border: "3px solid var(--primary-glow)",
+    borderTop: "3px solid var(--primary)",
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
     display: "inline-block",
@@ -457,17 +457,17 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     marginTop: 24,
     paddingTop: 20,
-    borderTop: "1px solid #2A2A3E",
+    borderTop: "1px solid var(--border)",
   },
-  footerLink: { color: "#6B6B88", fontSize: "0.8rem" },
+  footerLink: { color: "var(--text-muted)", fontSize: "0.8rem", transition: "var(--transition)" },
   bookingLoginBadge: {
-    background: "rgba(255, 61, 0, 0.1)",
-    border: "1px solid rgba(255, 61, 0, 0.25)",
-    color: "#FF3D00",
-    borderRadius: 12,
+    background: "rgba(0,102,255,0.05)",
+    border: "1px solid rgba(0,102,255,0.2)",
+    color: "var(--accent)",
+    borderRadius: 8,
     padding: "12px 16px",
     fontSize: "0.88rem",
-    fontWeight: 600,
+    fontWeight: 700,
     marginBottom: 20,
     textAlign: "center" as const,
     lineHeight: 1.4,
@@ -476,7 +476,7 @@ const styles: Record<string, React.CSSProperties> = {
 
 export default function UserLogin() {
   return (
-    <Suspense fallback={<div style={styles.page}><span style={styles.spinner} /></div>}>
+    <Suspense fallback={<div style={styles.page}><span className="spinner" style={styles.spinner} /></div>}>
       <LoginForm />
     </Suspense>
   );

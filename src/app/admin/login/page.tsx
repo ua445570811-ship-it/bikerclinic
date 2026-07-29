@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -29,14 +30,16 @@ export default function AdminLogin() {
     <div style={styles.page}>
       {/* Background Glow */}
       <div style={styles.glowPurple} />
-      <div style={styles.glowRed} />
+      <div style={styles.glowDark} />
 
       <div className="booking-card anim-fade-up" style={styles.card}>
         {/* Header */}
         <div style={styles.logoRow}>
-          <div style={styles.logoIcon}>🏍️</div>
+          <div style={styles.logoIcon}>
+            <span className="material-symbols-outlined" style={{ fontSize: "1.5rem", color: "var(--admin-accent)" }}>admin_panel_settings</span>
+          </div>
           <div>
-            <div style={styles.logoText}>Biker<span style={{ color: "#FF3D00" }}>Clinic</span></div>
+            <div style={styles.logoText}>Biker<span style={{ color: "var(--primary)" }}>Clinic</span></div>
             <div style={styles.logoSub}>Executive Admin Portal</div>
           </div>
         </div>
@@ -78,17 +81,20 @@ export default function AdminLogin() {
             disabled={loading}
           >
             {loading ? (
-              <span style={styles.spinner} />
+              <span className="spinner" style={styles.spinner} />
             ) : (
-              "Access Dashboard →"
+              <>
+                Access Dashboard
+                <span className="material-symbols-outlined" style={{ fontSize: "1.1rem" }}>vpn_key</span>
+              </>
             )}
           </button>
         </form>
 
         <div style={styles.footer}>
-          <a href="/" style={styles.footerLink}>← Back to Public Site</a>
-          <a href="/mechanic/login" style={styles.footerLink}>Mechanic Portal</a>
-          <a href="/user/login" style={styles.footerLink}>Customer Login</a>
+          <Link href="/" style={styles.footerLink}>← Public Site</Link>
+          <Link href="/mechanic/login" style={styles.footerLink}>Technician Portal</Link>
+          <Link href="/user/login" style={styles.footerLink}>Customer Login</Link>
         </div>
       </div>
     </div>
@@ -104,37 +110,37 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "24px",
     position: "relative",
     overflow: "hidden",
-    background: "#0A0A14",
+    background: "var(--bg)",
+    color: "var(--text-primary)"
   },
   glowPurple: {
     position: "absolute",
     width: 500,
     height: 500,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)",
+    background: "radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%)",
     top: -100,
     right: -100,
     pointerEvents: "none",
   },
-  glowRed: {
+  glowDark: {
     position: "absolute",
     width: 400,
     height: 400,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,61,0,0.08) 0%, transparent 70%)",
+    background: "radial-gradient(circle, rgba(255,255,255,0.01) 0%, transparent 70%)",
     bottom: -80,
     left: -80,
     pointerEvents: "none",
   },
   card: {
-    background: "rgba(22, 22, 34, 0.95)",
-    backdropFilter: "blur(20px)",
-    border: "1px solid #2A2A3E",
-    borderRadius: 20,
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 16,
     padding: "40px",
     width: "100%",
     maxWidth: 460,
-    boxShadow: "0 8px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.1)",
+    boxShadow: "var(--shadow-lg)",
     position: "relative",
     zIndex: 1,
   },
@@ -147,46 +153,26 @@ const styles: Record<string, React.CSSProperties> = {
   logoIcon: {
     width: 48,
     height: 48,
-    borderRadius: 12,
-    background: "rgba(255,61,0,0.1)",
+    borderRadius: 8,
+    background: "rgba(99, 102, 241, 0.08)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "1.5rem",
-    border: "1px solid rgba(255,61,0,0.2)",
+    border: "1px solid rgba(99, 102, 241, 0.2)",
   },
-  logoText: {
-    fontSize: "1.2rem",
-    fontWeight: 700,
-    lineHeight: 1.2,
-  },
-  logoSub: {
-    fontSize: "0.75rem",
-    color: "#6366F1",
-    fontWeight: 600,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-  },
+  logoText: { fontSize: "1.25rem", fontWeight: 900, lineHeight: 1.2, letterSpacing: "-0.02em" },
+  logoSub: { fontSize: "0.75rem", color: "var(--admin-accent)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" },
   divider: {
     height: 1,
-    background: "linear-gradient(to right, #6366F1, transparent)",
+    background: "linear-gradient(to right, var(--admin-accent), transparent)",
     marginBottom: 28,
-    opacity: 0.5,
+    opacity: 0.3,
   },
-  heading: {
-    fontSize: "1.6rem",
-    fontWeight: 700,
-    marginBottom: 8,
-  },
-  subheading: {
-    color: "#6B6B88",
-    fontSize: "0.9rem",
-    marginBottom: 28,
-    lineHeight: 1.5,
-  },
+  heading: { fontSize: "1.5rem", fontWeight: 800, marginBottom: 8, letterSpacing: "-0.02em" },
+  subheading: { color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: 28, lineHeight: 1.5 },
   errorMsg: {
-    background: "rgba(239,68,68,0.1)",
-    border: "1px solid rgba(239,68,68,0.3)",
+    background: "rgba(239,68,68,0.05)",
+    border: "1px solid rgba(239,68,68,0.2)",
     color: "#EF4444",
     borderRadius: 8,
     padding: "12px 16px",
@@ -196,19 +182,19 @@ const styles: Record<string, React.CSSProperties> = {
   submitBtn: {
     width: "100%",
     padding: "16px",
-    background: "linear-gradient(135deg, #6366F1, #4F46E5)",
+    background: "var(--admin-accent)",
     color: "#fff",
     border: "none",
-    borderRadius: 12,
-    fontWeight: 700,
+    borderRadius: 8,
+    fontWeight: 800,
     fontSize: "1rem",
     cursor: "pointer",
-    transition: "all 0.2s",
+    transition: "var(--transition)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    boxShadow: "0 4px 20px rgba(99,102,241,0.3)",
+    boxShadow: "0 4px 14px rgba(99, 102, 241, 0.25)",
   },
   spinner: {
     width: 20,
@@ -224,13 +210,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     marginTop: 24,
     paddingTop: 20,
-    borderTop: "1px solid #2A2A3E",
-    gap: 12,
-    flexWrap: "wrap",
+    borderTop: "1px solid var(--border)",
   },
-  footerLink: {
-    color: "#6B6B88",
-    fontSize: "0.8rem",
-    transition: "color 0.2s",
-  },
+  footerLink: { color: "var(--text-muted)", fontSize: "0.8rem", transition: "var(--transition)" },
 };

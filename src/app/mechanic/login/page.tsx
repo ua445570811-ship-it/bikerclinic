@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function MechanicLogin() {
   const [name, setName] = useState("");
@@ -51,10 +52,12 @@ export default function MechanicLogin() {
 
       <div className="booking-card anim-fade-up" style={styles.card}>
         <div style={styles.badgeRow}>
-          <div style={styles.badge}>👨‍🔧 MECHANIC PORTAL</div>
+          <div style={styles.badge}>👨‍🔧 TECHNICIAN PORTAL</div>
         </div>
 
-        <div style={styles.iconCircle}>🔧</div>
+        <div style={styles.iconCircle}>
+          <span className="material-symbols-outlined" style={{ fontSize: "2rem", color: "var(--mechanic-accent)" }}>construction</span>
+        </div>
         <h1 style={styles.heading}>Field Technician Login</h1>
         <p style={styles.subheading}>Access your assigned job queue. For BikerClinic certified mechanics only.</p>
 
@@ -91,14 +94,19 @@ export default function MechanicLogin() {
             style={{ ...styles.submitBtn, opacity: loading ? 0.7 : 1 }}
             disabled={loading}
           >
-            {loading ? <span style={styles.spinner} /> : "Enter Field App →"}
+            {loading ? <span className="spinner" style={styles.spinner} /> : (
+              <>
+                Enter Field App
+                <span className="material-symbols-outlined" style={{ fontSize: "1.1rem" }}>input</span>
+              </>
+            )}
           </button>
         </form>
 
         <div style={styles.footer}>
-          <a href="/" style={styles.footerLink}>← Public Site</a>
-          <a href="/admin/login" style={styles.footerLink}>Admin Portal</a>
-          <a href="/user/login" style={styles.footerLink}>Customer Login</a>
+          <Link href="/" style={styles.footerLink}>← Public Site</Link>
+          <Link href="/admin/login" style={styles.footerLink}>Admin Portal</Link>
+          <Link href="/user/login" style={styles.footerLink}>Customer Login</Link>
         </div>
       </div>
     </div>
@@ -114,14 +122,15 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "24px",
     position: "relative",
     overflow: "hidden",
-    background: "#0E0E18",
+    background: "var(--bg)",
+    color: "var(--text-primary)"
   },
   glowAmber: {
     position: "absolute",
     width: 500,
     height: 500,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(245,158,11,0.1) 0%, transparent 70%)",
+    background: "radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%)",
     top: -80,
     left: "50%",
     transform: "translateX(-50%)",
@@ -129,23 +138,22 @@ const styles: Record<string, React.CSSProperties> = {
   },
   glowDark: {
     position: "absolute",
-    width: 300,
-    height: 300,
+    width: 400,
+    height: 400,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,61,0,0.06) 0%, transparent 70%)",
-    bottom: -40,
-    right: -40,
+    background: "radial-gradient(circle, rgba(255,255,255,0.01) 0%, transparent 70%)",
+    bottom: -80,
+    right: -80,
     pointerEvents: "none",
   },
   card: {
-    background: "rgba(22, 22, 34, 0.95)",
-    backdropFilter: "blur(20px)",
-    border: "1px solid #2A2A3E",
-    borderRadius: 20,
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 16,
     padding: "40px",
     width: "100%",
-    maxWidth: 440,
-    boxShadow: "0 8px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(245,158,11,0.08)",
+    maxWidth: 460,
+    boxShadow: "var(--shadow-lg)",
     position: "relative",
     zIndex: 1,
     textAlign: "center",
@@ -156,9 +164,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 20,
   },
   badge: {
-    background: "rgba(245,158,11,0.1)",
-    color: "#F59E0B",
-    border: "1px solid rgba(245,158,11,0.25)",
+    background: "rgba(245,158,11,0.08)",
+    color: "var(--mechanic-accent)",
+    border: "1px solid rgba(245,158,11,0.2)",
     padding: "6px 14px",
     borderRadius: 99,
     fontSize: "0.75rem",
@@ -166,31 +174,31 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: "0.08em",
   },
   iconCircle: {
-    width: 72,
-    height: 72,
+    width: 64,
+    height: 64,
     borderRadius: "50%",
-    background: "rgba(245,158,11,0.1)",
-    border: "2px solid rgba(245,158,11,0.2)",
+    background: "rgba(245,158,11,0.08)",
+    border: "1px solid rgba(245,158,11,0.2)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "2rem",
     margin: "0 auto 20px",
   },
   heading: {
-    fontSize: "1.6rem",
-    fontWeight: 700,
+    fontSize: "1.5rem",
+    fontWeight: 800,
     marginBottom: 8,
+    letterSpacing: "-0.02em"
   },
   subheading: {
-    color: "#6B6B88",
+    color: "var(--text-secondary)",
     fontSize: "0.9rem",
     marginBottom: 28,
     lineHeight: 1.5,
   },
   errorMsg: {
-    background: "rgba(239,68,68,0.1)",
-    border: "1px solid rgba(239,68,68,0.3)",
+    background: "rgba(239,68,68,0.05)",
+    border: "1px solid rgba(239,68,68,0.2)",
     color: "#EF4444",
     borderRadius: 8,
     padding: "12px 16px",
@@ -201,24 +209,24 @@ const styles: Record<string, React.CSSProperties> = {
   submitBtn: {
     width: "100%",
     padding: "16px",
-    background: "linear-gradient(135deg, #F59E0B, #D97706)",
+    background: "var(--mechanic-accent)",
     color: "#000",
     border: "none",
-    borderRadius: 12,
-    fontWeight: 700,
+    borderRadius: 8,
+    fontWeight: 800,
     fontSize: "1rem",
     cursor: "pointer",
-    transition: "all 0.2s",
+    transition: "var(--transition)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    boxShadow: "0 4px 20px rgba(245,158,11,0.3)",
+    boxShadow: "0 4px 14px rgba(245,158,11,0.25)",
   },
   spinner: {
     width: 20,
     height: 20,
-    border: "3px solid rgba(0,0,0,0.3)",
+    border: "3px solid rgba(0,0,0,0.15)",
     borderTop: "3px solid #000",
     borderRadius: "50%",
     animation: "spin 0.7s linear infinite",
@@ -229,10 +237,11 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     marginTop: 24,
     paddingTop: 20,
-    borderTop: "1px solid #2A2A3E",
+    borderTop: "1px solid var(--border)",
   },
   footerLink: {
-    color: "#6B6B88",
+    color: "var(--text-muted)",
     fontSize: "0.8rem",
+    transition: "var(--transition)"
   },
 };
