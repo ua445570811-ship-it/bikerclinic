@@ -211,7 +211,7 @@ export default function HeroSequence() {
   const [activePhase, setActivePhase] = useState<TextPhase>(TEXT_PHASES[0]);
   const [phaseVisible, setPhaseVisible] = useState(false);
 
-  // Draw frame to canvas with nearest loaded fallback
+  // Draw frame to canvas with nearest loaded fallback and mobile-responsive aspect fitting
   const drawFrame = useCallback((index: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -243,23 +243,50 @@ export default function HeroSequence() {
     }
 
     const { width, height } = canvas;
+    ctx.clearRect(0, 0, width, height);
+
     const imgAspect = img.naturalWidth / img.naturalHeight;
     const canvasAspect = width / height;
 
-    let sx = 0,
-      sy = 0,
-      sw = img.naturalWidth,
-      sh = img.naturalHeight;
+    // Mobile / Vertical screen fitting (width < 768 or canvasAspect < 1.1)
+    if (width < 768 || canvasAspect < 1.1) {
+      // Fit full image width inside canvas so whole motorcycle is 100% visible on phone
+      const scale = width / img.naturalWidth;
+      const renderW = width;
+      const renderH = img.naturalHeight * scale;
 
-    if (imgAspect > canvasAspect) {
-      sw = img.naturalHeight * canvasAspect;
-      sx = (img.naturalWidth - sw) / 2;
+      // Position bike in upper-middle of mobile viewport (38% of screen height)
+      const dx = 0;
+      const dy = Math.max(10, height * 0.38 - renderH / 2);
+
+      ctx.drawImage(
+        img,
+        0,
+        0,
+        img.naturalWidth,
+        img.naturalHeight,
+        dx,
+        dy,
+        renderW,
+        renderH
+      );
     } else {
-      sh = img.naturalWidth / canvasAspect;
-      sy = (img.naturalHeight - sh) / 2;
-    }
+      // Desktop crop (cover mode)
+      let sx = 0,
+        sy = 0,
+        sw = img.naturalWidth,
+        sh = img.naturalHeight;
 
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
+      if (imgAspect > canvasAspect) {
+        sw = img.naturalHeight * canvasAspect;
+        sx = (img.naturalWidth - sw) / 2;
+      } else {
+        sh = img.naturalWidth / canvasAspect;
+        sy = (img.naturalHeight - sh) / 2;
+      }
+
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
+    }
   }, []);
 
   // Progressive preloading of all 208 frames
