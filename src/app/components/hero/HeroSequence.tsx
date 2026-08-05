@@ -211,14 +211,36 @@ export default function HeroSequence() {
   const [activePhase, setActivePhase] = useState<TextPhase>(TEXT_PHASES[0]);
   const [phaseVisible, setPhaseVisible] = useState(false);
 
-  // Draw frame to canvas
+  // Draw frame to canvas with nearest loaded fallback
   const drawFrame = useCallback((index: number) => {
     const canvas = canvasRef.current;
-    const img = imagesRef.current[index];
-    if (!canvas || !img || !img.complete) return;
+    if (!canvas) return;
+
+    let img = imagesRef.current[index];
+    if (!img || !img.complete || img.naturalWidth === 0) {
+      // Find nearest loaded frame
+      for (let offset = 1; offset < TOTAL_FRAMES; offset++) {
+        const prev = imagesRef.current[index - offset];
+        if (prev && prev.complete && prev.naturalWidth > 0) {
+          img = prev;
+          break;
+        }
+        const next = imagesRef.current[index + offset];
+        if (next && next.complete && next.naturalWidth > 0) {
+          img = next;
+          break;
+        }
+      }
+    }
+    if (!img || !img.complete || img.naturalWidth === 0) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    if (canvas.width === 0 || canvas.height === 0) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
 
     const { width, height } = canvas;
     const imgAspect = img.naturalWidth / img.naturalHeight;
@@ -240,19 +262,26 @@ export default function HeroSequence() {
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
   }, []);
 
-  // Preload all 208 images reliably
+  // Progressive preloading of all 208 frames
   useEffect(() => {
     let isCancelled = false;
     let loadedCount = 0;
 
+    const imgArray: HTMLImageElement[] = new Array(TOTAL_FRAMES);
+    imagesRef.current = imgArray;
+
     const loadSingleImage = (index: number): Promise<HTMLImageElement> => {
       return new Promise((resolve) => {
         const img = new window.Image();
+        imgArray[index - 1] = img;
+
         const finish = () => {
           if (!isCancelled) {
             loadedCount++;
             setLoadProgress(Math.round((loadedCount / TOTAL_FRAMES) * 100));
-            if (index === 1) drawFrame(0);
+            if (index - 1 === frameIndexRef.current || index === 1) {
+              drawFrame(frameIndexRef.current);
+            }
           }
           resolve(img);
         };
@@ -262,28 +291,32 @@ export default function HeroSequence() {
       });
     };
 
-    const fallbackTimer = setTimeout(() => {
+    const startPreload = async () => {
+      // Load initial frame first for instant display
+      await loadSingleImage(1);
       if (!isCancelled) {
-        setLoadProgress(100);
-        setIsLoaded(true);
-      }
-    }, 3800);
-
-    Promise.all(
-      Array.from({ length: TOTAL_FRAMES }, (_, i) => loadSingleImage(i + 1))
-    ).then((loadedImages) => {
-      if (!isCancelled) {
-        clearTimeout(fallbackTimer);
-        imagesRef.current = loadedImages;
-        setLoadProgress(100);
         setIsLoaded(true);
         drawFrame(0);
       }
-    });
+      // Load initial batch
+      for (let i = 2; i <= Math.min(15, TOTAL_FRAMES); i++) {
+        if (isCancelled) break;
+        loadSingleImage(i);
+      }
+      // Load remaining frames asynchronously
+      const remaining = Array.from(
+        { length: TOTAL_FRAMES - 15 },
+        (_, i) => i + 16
+      );
+      remaining.forEach((idx) => {
+        if (!isCancelled) loadSingleImage(idx);
+      });
+    };
+
+    startPreload();
 
     return () => {
       isCancelled = true;
-      clearTimeout(fallbackTimer);
     };
   }, [drawFrame]);
 
